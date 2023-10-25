@@ -11,8 +11,8 @@ import (
 
 	"github.com/mainflux/mainflux/internal/server"
 	"github.com/mainflux/mainflux/logger"
-	gocoap "github.com/plgd-dev/go-coap/v2"
-	"github.com/plgd-dev/go-coap/v2/mux"
+	gocoap "github.com/plgd-dev/go-coap/v3"
+	"github.com/plgd-dev/go-coap/v3/mux"
 )
 
 const (

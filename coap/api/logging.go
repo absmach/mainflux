@@ -12,7 +12,6 @@ import (
 
 	"github.com/mainflux/mainflux/coap"
 	mflog "github.com/mainflux/mainflux/logger"
-	"github.com/mainflux/mainflux/pkg/messaging"
 )
 
 var _ coap.Service = (*loggingMiddleware)(nil)
@@ -25,25 +24,6 @@ type loggingMiddleware struct {
 // LoggingMiddleware adds logging facilities to the adapter.
 func LoggingMiddleware(svc coap.Service, logger mflog.Logger) coap.Service {
 	return &loggingMiddleware{logger, svc}
-}
-
-// Publish logs the publish request. It logs the channel ID, subtopic (if any) and the time it took to complete the request.
-// If the request fails, it logs the error.
-func (lm *loggingMiddleware) Publish(ctx context.Context, key string, msg *messaging.Message) (err error) {
-	defer func(begin time.Time) {
-		destChannel := msg.Channel
-		if msg.Subtopic != "" {
-			destChannel = fmt.Sprintf("%s.%s", destChannel, msg.Subtopic)
-		}
-		message := fmt.Sprintf("Method publish to %s took %s to complete", destChannel, time.Since(begin))
-		if err != nil {
-			lm.logger.Warn(fmt.Sprintf("%s with error: %s.", message, err))
-			return
-		}
-		lm.logger.Info(fmt.Sprintf("%s without errors.", message))
-	}(time.Now())
-
-	return lm.svc.Publish(ctx, key, msg)
 }
 
 // Subscribe logs the subscribe request. It logs the channel ID, subtopic (if any) and the time it took to complete the request.

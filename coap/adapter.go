@@ -23,10 +23,6 @@ var ErrUnsubscribe = errors.New("unable to unsubscribe")
 
 // Service specifies CoAP service API.
 type Service interface {
-	// Publish publishes message to specified channel.
-	// Key is used to authorize publisher.
-	Publish(ctx context.Context, key string, msg *messaging.Message) error
-
 	// Subscribes to channel with specified id, subtopic and adds subscription to
 	// service map of subscriptions under given ID.
 	Subscribe(ctx context.Context, key, chanID, subtopic string, c Client) error
@@ -55,43 +51,7 @@ func New(auth mainflux.AuthzServiceClient, pubsub messaging.PubSub) Service {
 	return as
 }
 
-func (svc *adapterService) Publish(ctx context.Context, key string, msg *messaging.Message) error {
-	ar := &mainflux.AuthorizeReq{
-		Namespace:   "",
-		SubjectType: "thing",
-		Permission:  "publish",
-		Subject:     key,
-		Object:      msg.Channel,
-		ObjectType:  "group",
-	}
-	res, err := svc.auth.Authorize(ctx, ar)
-	if err != nil {
-		return errors.Wrap(errors.ErrAuthorization, err)
-	}
-	if !res.GetAuthorized() {
-		return errors.ErrAuthorization
-	}
-	msg.Publisher = res.GetId()
-
-	return svc.pubsub.Publish(ctx, msg.Channel, msg)
-}
-
 func (svc *adapterService) Subscribe(ctx context.Context, key, chanID, subtopic string, c Client) error {
-	ar := &mainflux.AuthorizeReq{
-		Namespace:   "",
-		SubjectType: "thing",
-		Permission:  "subscribe",
-		Subject:     key,
-		Object:      chanID,
-		ObjectType:  "group",
-	}
-	res, err := svc.auth.Authorize(ctx, ar)
-	if err != nil {
-		return errors.Wrap(errors.ErrAuthorization, err)
-	}
-	if !res.GetAuthorized() {
-		return errors.ErrAuthorization
-	}
 	subject := fmt.Sprintf("%s.%s", chansPrefix, chanID)
 	if subtopic != "" {
 		subject = fmt.Sprintf("%s.%s", subject, subtopic)

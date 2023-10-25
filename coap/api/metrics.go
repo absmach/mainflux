@@ -11,7 +11,6 @@ import (
 
 	"github.com/go-kit/kit/metrics"
 	"github.com/mainflux/mainflux/coap"
-	"github.com/mainflux/mainflux/pkg/messaging"
 )
 
 var _ coap.Service = (*metricsMiddleware)(nil)
@@ -29,16 +28,6 @@ func MetricsMiddleware(svc coap.Service, counter metrics.Counter, latency metric
 		latency: latency,
 		svc:     svc,
 	}
-}
-
-// Publish instruments Publish method with metrics.
-func (mm *metricsMiddleware) Publish(ctx context.Context, key string, msg *messaging.Message) error {
-	defer func(begin time.Time) {
-		mm.counter.With("method", "publish").Add(1)
-		mm.latency.With("method", "publish").Observe(time.Since(begin).Seconds())
-	}(time.Now())
-
-	return mm.svc.Publish(ctx, key, msg)
 }
 
 // Subscribe instruments Subscribe method with metrics.

@@ -4,8 +4,8 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"errors"
-	"io/ioutil"
 	"net"
+	"os"
 )
 
 var (
@@ -15,7 +15,7 @@ var (
 
 // LoadTLSCfg return a TLS configuration that can be used in TLS servers
 func LoadTLSCfg(ca, crt, key string) (*tls.Config, error) {
-	caCertPEM, err := ioutil.ReadFile(ca)
+	caCertPEM, err := os.ReadFile(ca)
 	if err != nil {
 		return nil, err
 	}

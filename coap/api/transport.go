@@ -4,6 +4,7 @@
 package api
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -19,9 +20,9 @@ import (
 	mflog "github.com/mainflux/mainflux/logger"
 	"github.com/mainflux/mainflux/pkg/errors"
 	"github.com/mainflux/mainflux/pkg/messaging"
-	"github.com/plgd-dev/go-coap/v2/message"
-	"github.com/plgd-dev/go-coap/v2/message/codes"
-	"github.com/plgd-dev/go-coap/v2/mux"
+	"github.com/plgd-dev/go-coap/v3/message"
+	"github.com/plgd-dev/go-coap/v3/message/codes"
+	"github.com/plgd-dev/go-coap/v3/mux"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
@@ -65,20 +66,28 @@ func MakeCoAPHandler(svc coap.Service, l mflog.Logger) mux.HandlerFunc {
 	return handler
 }
 
-func sendResp(w mux.ResponseWriter, resp *message.Message) {
-	if err := w.Client().WriteMessage(resp); err != nil {
-		logger.Warn(fmt.Sprintf("Can't set response: %s", err))
+func sendResp(w mux.ResponseWriter, resp *message.Message, isObs bool) {
+	m := w.Conn().AcquireMessage(w.Conn().Context())
+	defer w.Conn().ReleaseMessage(m)
+	m.SetCode(resp.Code)
+	m.SetBody(bytes.NewReader(resp.Payload))
+	m.SetToken(resp.Token)
+	for _, option := range resp.Options {
+		m.SetOptionBytes(option.ID, option.Value)
+	}
+	if !isObs {
+		if err := w.Conn().WriteMessage(m); err != nil {
+			logger.Warn(fmt.Sprintf("Can't set response: %s", err))
+		}
 	}
 }
 
 func handler(w mux.ResponseWriter, m *mux.Message) {
 	resp := message.Message{
 		Code:    codes.Content,
-		Token:   m.Token,
-		Context: m.Context,
+		Token:   m.Token(),
 		Options: make(message.Options, 0, 16),
 	}
-	defer sendResp(w, &resp)
 	msg, err := decodeMessage(m)
 	if err != nil {
 		logger.Warn(fmt.Sprintf("Error decoding message: %s", err))
@@ -91,15 +100,17 @@ func handler(w mux.ResponseWriter, m *mux.Message) {
 		resp.Code = codes.Unauthorized
 		return
 	}
-	switch m.Code {
+	var isObs bool = false
+	switch m.Code() {
 	case codes.GET:
-		err = handleGet(m.Context, m, w.Client(), msg, key)
+		isObs, err = handleGet(context.Background(), m, w, msg, key)
 	case codes.POST:
 		resp.Code = codes.Created
-		err = service.Publish(m.Context, key, msg)
+		err = nil
 	default:
 		err = errors.ErrNotFound
 	}
+	defer sendResp(w, &resp, isObs)
 	if err != nil {
 		switch {
 		case err == errBadOptions:
@@ -115,25 +126,25 @@ func handler(w mux.ResponseWriter, m *mux.Message) {
 	}
 }
 
-func handleGet(ctx context.Context, m *mux.Message, c mux.Client, msg *messaging.Message, key string) error {
+func handleGet(ctx context.Context, m *mux.Message, c mux.ResponseWriter, msg *messaging.Message, key string) (bool, error) {
 	var obs uint32
-	obs, err := m.Options.Observe()
+	obs, err := m.Observe()
 	if err != nil {
 		logger.Warn(fmt.Sprintf("Error reading observe option: %s", err))
-		return errBadOptions
+		return false, errBadOptions
 	}
 	if obs == startObserve {
-		c := coap.NewClient(c, m.Token, logger)
-		return service.Subscribe(ctx, key, msg.Channel, msg.Subtopic, c)
+		c := coap.NewClient(c, m.Token(), logger)
+		return true, service.Subscribe(ctx, key, msg.Channel, msg.Subtopic, c)
 	}
-	return service.Unsubscribe(ctx, key, msg.Channel, msg.Subtopic, m.Token.String())
+	return false, service.Unsubscribe(ctx, key, msg.Channel, msg.Subtopic, m.Token().String())
 }
 
 func decodeMessage(msg *mux.Message) (*messaging.Message, error) {
-	if msg.Options == nil {
+	if msg.Options() == nil {
 		return &messaging.Message{}, errBadOptions
 	}
-	path, err := msg.Options.Path()
+	path, err := msg.Path()
 	if err != nil {
 		return &messaging.Message{}, err
 	}
@@ -154,8 +165,8 @@ func decodeMessage(msg *mux.Message) (*messaging.Message, error) {
 		Created:  time.Now().UnixNano(),
 	}
 
-	if msg.Body != nil {
-		buff, err := io.ReadAll(msg.Body)
+	if msg.Body() != nil {
+		buff, err := io.ReadAll(msg.Body())
 		if err != nil {
 			return ret, err
 		}
@@ -165,10 +176,10 @@ func decodeMessage(msg *mux.Message) (*messaging.Message, error) {
 }
 
 func parseKey(msg *mux.Message) (string, error) {
-	if obs, _ := msg.Options.Observe(); obs != 0 && msg.Code == codes.GET {
+	if obs, _ := msg.Observe(); obs != 0 && msg.Code() == codes.GET {
 		return "", nil
 	}
-	authKey, err := msg.Options.GetString(message.URIQuery)
+	authKey, err := msg.Options().GetString(message.URIQuery)
 	if err != nil {
 		return "", err
 	}

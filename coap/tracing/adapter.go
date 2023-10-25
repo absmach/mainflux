@@ -7,7 +7,6 @@ import (
 	"context"
 
 	"github.com/mainflux/mainflux/coap"
-	"github.com/mainflux/mainflux/pkg/messaging"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 )
@@ -33,13 +32,6 @@ func New(tracer trace.Tracer, svc coap.Service) coap.Service {
 		tracer: tracer,
 		svc:    svc,
 	}
-}
-
-// Publish traces a CoAP publish operation.
-func (tm *tracingServiceMiddleware) Publish(ctx context.Context, key string, msg *messaging.Message) error {
-	ctx, span := tm.tracer.Start(ctx, publishOP)
-	defer span.End()
-	return tm.svc.Publish(ctx, key, msg)
 }
 
 // Subscribe traces a CoAP subscribe operation.
