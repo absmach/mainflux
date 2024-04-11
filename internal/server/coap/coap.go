@@ -6,9 +6,11 @@ package coap
 import (
 	"context"
 	"crypto/tls"
+	"crypto/x509"
 	"fmt"
 	"log/slog"
 	"time"
+	"os"
 
 	"github.com/absmach/magistrala/internal/server"
 	gocoap "github.com/plgd-dev/go-coap/v2"
@@ -23,6 +25,8 @@ type Server struct {
 	server.BaseServer
 	handler mux.HandlerFunc
 }
+
+
 
 var _ server.Server = (*Server)(nil)
 
@@ -51,13 +55,31 @@ func (s *Server) Start() error {
 		if err != nil {
 			return fmt.Errorf("failed to load auth certificates: %w", err)
 		}
-		tlsConfig := &tls.Config{
-			Certificates: []tls.Certificate{certificate},
+		dtlsConfig := &piondtls.Config{
+			Certificates:         []tls.Certificate{certificate},
+			ExtendedMasterSecret: piondtls.RequireExtendedMasterSecret,
+			ClientAuth:           piondtls.RequireAndVerifyClientCert,
+			ConnectContextMaker: func() (context.Context, func()) {
+				return context.WithTimeout(s.Ctx, 30*time.Second)
+			},
+		}
+		clientCA, err := loadCertFile(s.Config.ClientCAFile)
+		if err != nil {
+			return fmt.Errorf("failed to load client ca file: %w", err)
+		}
+		if len(clientCA) > 0 {
+			if dtlsConfig.ClientCAs == nil {
+				dtlsConfig.ClientCAs = x509.NewCertPool()
+			}
+			if !dtlsConfig.ClientCAs.AppendCertsFromPEM(clientCA) {
+				return fmt.Errorf("failed to append client ca to tls.Config")
+			}
 		}
 
 		go func() {
-			errCh <- gocoap.ListenAndServeTCPTLS("udp", s.Address, tlsConfig, s.handler)
+			errCh <- gocoap.ListenAndServeDTLS("udp", s.Address, dtlsConfig, s.handler)
 		}()
+
 	default:
 		s.Logger.Info(fmt.Sprintf("%s service %s server listening at %s without TLS", s.Name, s.Protocol, s.Address))
 		go func() {
@@ -84,3 +106,11 @@ func (s *Server) Stop() error {
 	s.Logger.Info(fmt.Sprintf("%s service shutdown of http at %s", s.Name, s.Address))
 	return nil
 }
+
+func loadCertFile(certFile string) ([]byte, error) {
+	if certFile != "" {
+		return os.ReadFile(certFile)
+	}
+	return []byte{}, nil
+}
+
