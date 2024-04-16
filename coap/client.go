@@ -12,9 +12,10 @@ import (
 
 	"github.com/absmach/magistrala/pkg/errors"
 	"github.com/absmach/magistrala/pkg/messaging"
-	"github.com/plgd-dev/go-coap/v2/message"
-	"github.com/plgd-dev/go-coap/v2/message/codes"
-	mux "github.com/plgd-dev/go-coap/v2/mux"
+	"github.com/plgd-dev/go-coap/v3/message"
+	"github.com/plgd-dev/go-coap/v3/message/codes"
+	"github.com/plgd-dev/go-coap/v3/message/pool"
+	mux "github.com/plgd-dev/go-coap/v3/mux"
 )
 
 // Client wraps CoAP client.
@@ -36,14 +37,14 @@ type Client interface {
 var ErrOption = errors.New("unable to set option")
 
 type client struct {
-	client  mux.Client
+	client  mux.ResponseWriter
 	token   message.Token
 	observe uint32
 	logger  *slog.Logger
 }
 
 // NewClient instantiates a new Observer.
-func NewClient(c mux.Client, tkn message.Token, l *slog.Logger) Client {
+func NewClient(c mux.ResponseWriter, tkn message.Token, l *slog.Logger) Client {
 	return &client{
 		client:  c,
 		token:   tkn,
@@ -53,20 +54,17 @@ func NewClient(c mux.Client, tkn message.Token, l *slog.Logger) Client {
 }
 
 func (c *client) Done() <-chan struct{} {
-	return c.client.Done()
+	return c.client.Conn().Done()
 }
 
 func (c *client) Cancel() error {
-	m := message.Message{
-		Code:    codes.Content,
-		Token:   c.token,
-		Context: context.Background(),
-		Options: make(message.Options, 0, 16),
-	}
-	if err := c.client.WriteMessage(&m); err != nil {
+	pm := c.client.Conn().AcquireMessage(context.Background())
+	pm.SetCode(codes.Content)
+	pm.SetToken(c.token)
+	if err := c.client.Conn().WriteMessage(pm); err != nil {
 		c.logger.Error(fmt.Sprintf("Error sending message: %s.", err))
 	}
-	return c.client.Close()
+	return c.client.Conn().Close()
 }
 
 func (c *client) Token() string {
@@ -74,12 +72,10 @@ func (c *client) Token() string {
 }
 
 func (c *client) Handle(msg *messaging.Message) error {
-	m := message.Message{
-		Code:    codes.Content,
-		Token:   c.token,
-		Context: c.client.Context(),
-		Body:    bytes.NewReader(msg.GetPayload()),
-	}
+	pm := pool.NewMessage(context.Background())
+	pm.SetCode(codes.Content)
+	pm.SetToken(c.token)
+	pm.SetBody(bytes.NewReader(msg.Payload))
 
 	atomic.AddUint32(&c.observe, 1)
 	var opts message.Options
@@ -103,6 +99,8 @@ func (c *client) Handle(msg *messaging.Message) error {
 		return fmt.Errorf("cannot set options to response: %w", err)
 	}
 
-	m.Options = opts
-	return c.client.WriteMessage(&m)
+	for _, option := range opts {
+		pm.SetOptionBytes(option.ID, option.Value)
+	}
+	return c.client.Conn().WriteMessage(pm)
 }
