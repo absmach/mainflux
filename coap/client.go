@@ -102,5 +102,8 @@ func (c *client) Handle(msg *messaging.Message) error {
 	for _, option := range opts {
 		pm.SetOptionBytes(option.ID, option.Value)
 	}
-	return c.client.Conn().WriteMessage(pm)
+	if err = c.client.Conn().WriteMessage(pm); err != nil {
+		return err
+	}
+	return nil
 }

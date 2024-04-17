@@ -93,12 +93,14 @@ func handler(w mux.ResponseWriter, m *mux.Message) {
 	if err != nil {
 		logger.Warn(fmt.Sprintf("Error decoding message: %s", err))
 		resp.Code = codes.BadRequest
+		sendResp(w, &resp, false)
 		return
 	}
 	key, err := parseKey(m)
 	if err != nil {
 		logger.Warn(fmt.Sprintf("Error parsing auth: %s", err))
 		resp.Code = codes.Unauthorized
+		sendResp(w, &resp, false)
 		return
 	}
 	var isObs bool = false
@@ -107,7 +109,7 @@ func handler(w mux.ResponseWriter, m *mux.Message) {
 		isObs, err = handleGet(context.Background(), m, w, msg, key)
 	case codes.POST:
 		resp.Code = codes.Created
-		err = nil
+		err = service.Publish(m.Context(), key, msg)
 	default:
 		err = svcerr.ErrNotFound
 	}
