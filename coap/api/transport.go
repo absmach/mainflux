@@ -4,7 +4,6 @@
 package api
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -23,6 +22,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/plgd-dev/go-coap/v3/message"
 	"github.com/plgd-dev/go-coap/v3/message/codes"
+	"github.com/plgd-dev/go-coap/v3/message/pool"
 	"github.com/plgd-dev/go-coap/v3/mux"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
@@ -67,80 +67,77 @@ func MakeCoAPHandler(svc coap.Service, l *slog.Logger) mux.HandlerFunc {
 	return handler
 }
 
-func sendResp(w mux.ResponseWriter, resp *message.Message, isObs bool) {
-	pm := w.Conn().AcquireMessage(w.Conn().Context())
-	defer w.Conn().ReleaseMessage(pm)
-	pm.SetCode(resp.Code)
-	pm.SetToken(resp.Token)
-	pm.SetBody(bytes.NewReader(resp.Payload))
-	for _, opt := range resp.Options {
-		pm.SetOptionBytes(opt.ID, opt.Value)
-	}
-	if !isObs {
-		if err := w.Conn().WriteMessage(pm); err != nil {
-			logger.Warn(fmt.Sprintf("Can't set response: %s", err))
+func sendResp(w mux.ResponseWriter, resp *pool.Message) {
+	if resp.Code() == codes.Content {
+		obs, err := resp.Options().Observe()
+		if err != nil {
+			logger.Warn(fmt.Sprintf("Error reading observe option: %s", err))
 		}
+		if obs == startObserve {
+			return
+		}
+	}
+	if err := w.Conn().WriteMessage(resp); err != nil {
+		logger.Warn(fmt.Sprintf("Can't set response: %s", err))
 	}
 }
 
 func handler(w mux.ResponseWriter, m *mux.Message) {
-	resp := message.Message{
-		Code:    codes.Content,
-		Token:   m.Token(),
-		Options: make(message.Options, 0, 16),
-	}
+	resp := pool.NewMessage(w.Conn().Context())
+	resp.SetToken(m.Token())
+	defer sendResp(w, resp)
+
 	msg, err := decodeMessage(m)
 	if err != nil {
 		logger.Warn(fmt.Sprintf("Error decoding message: %s", err))
-		resp.Code = codes.BadRequest
-		sendResp(w, &resp, false)
+		resp.SetCode(codes.BadRequest)
 		return
 	}
 	key, err := parseKey(m)
 	if err != nil {
 		logger.Warn(fmt.Sprintf("Error parsing auth: %s", err))
-		resp.Code = codes.Unauthorized
-		sendResp(w, &resp, false)
+		resp.SetCode(codes.Unauthorized)
 		return
 	}
-	var isObs bool = false
+
 	switch m.Code() {
 	case codes.GET:
-		isObs, err = handleGet(context.Background(), m, w, msg, key)
+		err = handleGet(context.Background(), m, w, msg, key)
+		resp.SetCode(codes.Content)
 	case codes.POST:
-		resp.Code = codes.Created
+		resp.SetCode(codes.Created)
 		err = service.Publish(m.Context(), key, msg)
 	default:
 		err = svcerr.ErrNotFound
 	}
-	defer sendResp(w, &resp, isObs)
+
 	if err != nil {
 		switch {
 		case err == errBadOptions:
-			resp.Code = codes.BadOption
+			resp.SetCode(codes.BadOption)
 		case err == svcerr.ErrNotFound:
-			resp.Code = codes.NotFound
+			resp.SetCode(codes.NotFound)
 		case errors.Contains(err, svcerr.ErrAuthorization),
 			errors.Contains(err, svcerr.ErrAuthentication):
-			resp.Code = codes.Unauthorized
+			resp.SetCode(codes.Unauthorized)
 		default:
-			resp.Code = codes.InternalServerError
+			resp.SetCode(codes.InternalServerError)
 		}
 	}
 }
 
-func handleGet(ctx context.Context, m *mux.Message, c mux.ResponseWriter, msg *messaging.Message, key string) (bool, error) {
+func handleGet(ctx context.Context, m *mux.Message, c mux.ResponseWriter, msg *messaging.Message, key string) error {
 	var obs uint32
 	obs, err := m.Observe()
 	if err != nil {
 		logger.Warn(fmt.Sprintf("Error reading observe option: %s", err))
-		return false, errBadOptions
+		return errBadOptions
 	}
 	if obs == startObserve {
 		c := coap.NewClient(c, m.Token(), logger)
-		return true, service.Subscribe(ctx, key, msg.GetChannel(), msg.GetSubtopic(), c)
+		return service.Subscribe(ctx, key, msg.GetChannel(), msg.GetSubtopic(), c)
 	}
-	return false, service.Unsubscribe(ctx, key, msg.GetChannel(), msg.GetSubtopic(), m.Token().String())
+	return service.Unsubscribe(ctx, key, msg.GetChannel(), msg.GetSubtopic(), m.Token().String())
 }
 
 func decodeMessage(msg *mux.Message) (*messaging.Message, error) {
