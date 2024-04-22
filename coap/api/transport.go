@@ -126,7 +126,7 @@ func handler(w mux.ResponseWriter, m *mux.Message) {
 	}
 }
 
-func handleGet(ctx context.Context, m *mux.Message, c mux.ResponseWriter, msg *messaging.Message, key string) error {
+func handleGet(ctx context.Context, m *mux.Message, writer mux.ResponseWriter, msg *messaging.Message, key string) error {
 	var obs uint32
 	obs, err := m.Observe()
 	if err != nil {
@@ -134,7 +134,7 @@ func handleGet(ctx context.Context, m *mux.Message, c mux.ResponseWriter, msg *m
 		return errBadOptions
 	}
 	if obs == startObserve {
-		c := coap.NewClient(c, m.Token(), logger)
+		c := coap.NewClient(writer, m.Token(), logger)
 		return service.Subscribe(ctx, key, msg.GetChannel(), msg.GetSubtopic(), c)
 	}
 	return service.Unsubscribe(ctx, key, msg.GetChannel(), msg.GetSubtopic(), m.Token().String())

@@ -5,7 +5,6 @@ package coap
 
 import (
 	"bytes"
-	"context"
 	"fmt"
 	"log/slog"
 	"sync/atomic"
@@ -37,16 +36,16 @@ type Client interface {
 var ErrOption = errors.New("unable to set option")
 
 type client struct {
-	client  mux.ResponseWriter
+	writer  mux.ResponseWriter
 	token   message.Token
 	observe uint32
 	logger  *slog.Logger
 }
 
 // NewClient instantiates a new Observer.
-func NewClient(c mux.ResponseWriter, tkn message.Token, l *slog.Logger) Client {
+func NewClient(w mux.ResponseWriter, tkn message.Token, l *slog.Logger) Client {
 	return &client{
-		client:  c,
+		writer:  w,
 		token:   tkn,
 		logger:  l,
 		observe: 0,
@@ -54,17 +53,17 @@ func NewClient(c mux.ResponseWriter, tkn message.Token, l *slog.Logger) Client {
 }
 
 func (c *client) Done() <-chan struct{} {
-	return c.client.Conn().Done()
+	return c.writer.Conn().Done()
 }
 
 func (c *client) Cancel() error {
-	pm := c.client.Conn().AcquireMessage(context.Background())
+	pm := c.writer.Conn().AcquireMessage(c.writer.Conn().Context())
 	pm.SetCode(codes.Content)
 	pm.SetToken(c.token)
-	if err := c.client.Conn().WriteMessage(pm); err != nil {
+	if err := c.writer.Conn().WriteMessage(pm); err != nil {
 		c.logger.Error(fmt.Sprintf("Error sending message: %s.", err))
 	}
-	return c.client.Conn().Close()
+	return c.writer.Conn().Close()
 }
 
 func (c *client) Token() string {
@@ -72,10 +71,10 @@ func (c *client) Token() string {
 }
 
 func (c *client) Handle(msg *messaging.Message) error {
-	pm := pool.NewMessage(context.Background())
+	pm := pool.NewMessage(c.writer.Conn().Context())
 	pm.SetCode(codes.Content)
 	pm.SetToken(c.token)
-	pm.SetBody(bytes.NewReader(msg.Payload))
+	pm.SetBody(bytes.NewReader(msg.GetPayload()))
 
 	atomic.AddUint32(&c.observe, 1)
 	var opts message.Options
@@ -102,7 +101,7 @@ func (c *client) Handle(msg *messaging.Message) error {
 	for _, option := range opts {
 		pm.SetOptionBytes(option.ID, option.Value)
 	}
-	if err = c.client.Conn().WriteMessage(pm); err != nil {
+	if err = c.writer.Conn().WriteMessage(pm); err != nil {
 		return err
 	}
 	return nil
