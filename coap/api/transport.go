@@ -85,6 +85,9 @@ func sendResp(w mux.ResponseWriter, resp *pool.Message) {
 func handler(w mux.ResponseWriter, m *mux.Message) {
 	resp := pool.NewMessage(w.Conn().Context())
 	resp.SetToken(m.Token())
+	for _, opt := range m.Options() {
+		resp.AddOptionBytes(opt.ID, opt.Value)
+	}
 	defer sendResp(w, resp)
 
 	msg, err := decodeMessage(m)
@@ -128,7 +131,7 @@ func handler(w mux.ResponseWriter, m *mux.Message) {
 
 func handleGet(ctx context.Context, m *mux.Message, writer mux.ResponseWriter, msg *messaging.Message, key string) error {
 	var obs uint32
-	obs, err := m.Observe()
+	obs, err := m.Options().Observe()
 	if err != nil {
 		logger.Warn(fmt.Sprintf("Error reading observe option: %s", err))
 		return errBadOptions
