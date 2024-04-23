@@ -36,16 +36,16 @@ type Client interface {
 var ErrOption = errors.New("unable to set option")
 
 type client struct {
-	writer  mux.ResponseWriter
+	conn    mux.Conn
 	token   message.Token
 	observe uint32
 	logger  *slog.Logger
 }
 
 // NewClient instantiates a new Observer.
-func NewClient(w mux.ResponseWriter, tkn message.Token, l *slog.Logger) Client {
+func NewClient(cc mux.Conn, tkn message.Token, l *slog.Logger) Client {
 	return &client{
-		writer:  w,
+		conn:    cc,
 		token:   tkn,
 		logger:  l,
 		observe: 0,
@@ -53,17 +53,17 @@ func NewClient(w mux.ResponseWriter, tkn message.Token, l *slog.Logger) Client {
 }
 
 func (c *client) Done() <-chan struct{} {
-	return c.writer.Conn().Done()
+	return c.conn.Done()
 }
 
 func (c *client) Cancel() error {
-	pm := c.writer.Conn().AcquireMessage(c.writer.Conn().Context())
+	pm := c.conn.AcquireMessage(c.conn.Context())
 	pm.SetCode(codes.Content)
 	pm.SetToken(c.token)
-	if err := c.writer.Conn().WriteMessage(pm); err != nil {
+	if err := c.conn.WriteMessage(pm); err != nil {
 		c.logger.Error(fmt.Sprintf("Error sending message: %s.", err))
 	}
-	return c.writer.Conn().Close()
+	return c.conn.Close()
 }
 
 func (c *client) Token() string {
@@ -71,7 +71,7 @@ func (c *client) Token() string {
 }
 
 func (c *client) Handle(msg *messaging.Message) error {
-	pm := pool.NewMessage(c.writer.Conn().Context())
+	pm := pool.NewMessage(c.conn.Context())
 	pm.SetCode(codes.Content)
 	pm.SetToken(c.token)
 	pm.SetBody(bytes.NewReader(msg.GetPayload()))
@@ -88,7 +88,6 @@ func (c *client) Handle(msg *messaging.Message) error {
 		c.logger.Error(fmt.Sprintf("Can't set content format: %s.", err))
 		return errors.Wrap(ErrOption, err)
 	}
-	opts = append(opts, message.Option{ID: message.Observe, Value: []byte{byte(c.observe)}})
 	opts, n, err = opts.SetObserve(buff, c.observe)
 	if err == message.ErrTooSmall {
 		buff = append(buff, make([]byte, n)...)
@@ -101,7 +100,8 @@ func (c *client) Handle(msg *messaging.Message) error {
 	for _, option := range opts {
 		pm.SetOptionBytes(option.ID, option.Value)
 	}
-	if err = c.writer.Conn().WriteMessage(pm); err != nil {
+
+	if err = c.conn.WriteMessage(pm); err != nil {
 		return err
 	}
 	return nil
