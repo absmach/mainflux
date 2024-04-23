@@ -102,7 +102,7 @@ func handler(w mux.ResponseWriter, m *mux.Message) {
 
 	switch m.Code() {
 	case codes.GET:
-		err = handleGet(context.Background(), m, w, msg, key)
+		err = handleGet(m.Context(), m, w, msg, key)
 		resp.SetCode(codes.Content)
 	case codes.POST:
 		resp.SetCode(codes.Created)
