@@ -68,15 +68,6 @@ func MakeCoAPHandler(svc coap.Service, l *slog.Logger) mux.HandlerFunc {
 }
 
 func sendResp(w mux.ResponseWriter, resp *pool.Message) {
-	if resp.Code() == codes.Content {
-		obs, err := resp.Options().Observe()
-		if err != nil {
-			logger.Warn(fmt.Sprintf("Error reading observe option: %s", err))
-		}
-		if obs == startObserve {
-			return
-		}
-	}
 	if err := w.Conn().WriteMessage(resp); err != nil {
 		logger.Warn(fmt.Sprintf("Can't set response: %s", err))
 	}
