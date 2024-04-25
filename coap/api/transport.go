@@ -4,7 +4,6 @@
 package api
 
 import (
-	"context"
 	"fmt"
 	"io"
 	"log/slog"
@@ -96,7 +95,7 @@ func handler(w mux.ResponseWriter, m *mux.Message) {
 
 	switch m.Code() {
 	case codes.GET:
-		err = handleGet(m.Context(), m, w, msg, key)
+		err = handleGet(m, w, msg, key)
 		resp.SetCode(codes.Content)
 	case codes.POST:
 		resp.SetCode(codes.Created)
@@ -120,7 +119,7 @@ func handler(w mux.ResponseWriter, m *mux.Message) {
 	}
 }
 
-func handleGet(ctx context.Context, m *mux.Message, w mux.ResponseWriter, msg *messaging.Message, key string) error {
+func handleGet(m *mux.Message, w mux.ResponseWriter, msg *messaging.Message, key string) error {
 	var obs uint32
 	obs, err := m.Options().Observe()
 	if err != nil {
@@ -129,9 +128,9 @@ func handleGet(ctx context.Context, m *mux.Message, w mux.ResponseWriter, msg *m
 	}
 	if obs == startObserve {
 		c := coap.NewClient(w.Conn(), m.Token(), logger)
-		return service.Subscribe(ctx, key, msg.GetChannel(), msg.GetSubtopic(), c)
+		return service.Subscribe(w.Conn().Context(), key, msg.GetChannel(), msg.GetSubtopic(), c)
 	}
-	return service.Unsubscribe(ctx, key, msg.GetChannel(), msg.GetSubtopic(), m.Token().String())
+	return service.Unsubscribe(w.Conn().Context(), key, msg.GetChannel(), msg.GetSubtopic(), m.Token().String())
 }
 
 func decodeMessage(msg *mux.Message) (*messaging.Message, error) {
