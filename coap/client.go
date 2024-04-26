@@ -5,6 +5,7 @@ package coap
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"log/slog"
 	"sync/atomic"
@@ -71,7 +72,7 @@ func (c *client) Token() string {
 }
 
 func (c *client) Handle(msg *messaging.Message) error {
-	pm := pool.NewMessage(c.conn.Context())
+	pm := pool.NewMessage(context.Background())
 	pm.SetCode(codes.Content)
 	pm.SetToken(c.token)
 	pm.SetBody(bytes.NewReader(msg.GetPayload()))
