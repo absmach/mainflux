@@ -12,6 +12,8 @@ import (
 	"github.com/absmach/magistrala/internal/server"
 	gocoap "github.com/plgd-dev/go-coap/v3"
 	"github.com/plgd-dev/go-coap/v3/mux"
+	"github.com/plgd-dev/go-coap/v3/options"
+	udpServer "github.com/plgd-dev/go-coap/v3/udp/server"
 )
 
 const (
@@ -40,12 +42,27 @@ func New(ctx context.Context, cancel context.CancelFunc, name string, config ser
 	}
 }
 
+type udpNilMonitor struct{}
+
+func (u *udpNilMonitor) UDPServerApply(cfg *udpServer.Config) {
+	cfg.CreateInactivityMonitor = nil
+}
+
+var _ udpServer.Option = (*udpNilMonitor)(nil)
+
+func NewUDPNilMonitor() udpServer.Option {
+	return &udpNilMonitor{}
+}
+
 func (s *Server) Start() error {
 	errCh := make(chan error)
 	s.Logger.Info(fmt.Sprintf("%s service started using http, exposed port %s", s.Name, s.Address))
 	s.Logger.Info(fmt.Sprintf("%s service %s server listening at %s without TLS", s.Name, s.Protocol, s.Address))
+
+	opts := []any{}
+	opts = append(opts, options.WithMux(s.handler), NewUDPNilMonitor())
 	go func() {
-		errCh <- gocoap.ListenAndServe("udp", s.Address, s.handler)
+		errCh <- gocoap.ListenAndServeWithOptions("udp", s.Address, opts...)
 	}()
 
 	select {

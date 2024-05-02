@@ -5,7 +5,6 @@ package coap
 
 import (
 	"bytes"
-	"context"
 	"fmt"
 	"log/slog"
 	"sync/atomic"
@@ -14,7 +13,6 @@ import (
 	"github.com/absmach/magistrala/pkg/messaging"
 	"github.com/plgd-dev/go-coap/v3/message"
 	"github.com/plgd-dev/go-coap/v3/message/codes"
-	"github.com/plgd-dev/go-coap/v3/message/pool"
 	mux "github.com/plgd-dev/go-coap/v3/mux"
 )
 
@@ -72,7 +70,8 @@ func (c *client) Token() string {
 }
 
 func (c *client) Handle(msg *messaging.Message) error {
-	pm := pool.NewMessage(context.Background())
+	pm := c.conn.AcquireMessage(c.conn.Context())
+	defer c.conn.ReleaseMessage(pm)
 	pm.SetCode(codes.Content)
 	pm.SetToken(c.token)
 	pm.SetBody(bytes.NewReader(msg.GetPayload()))
