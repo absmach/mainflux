@@ -169,9 +169,6 @@ func decodeMessage(msg *mux.Message) (*messaging.Message, error) {
 }
 
 func parseKey(msg *mux.Message) (string, error) {
-	if obs, _ := msg.Observe(); obs != 0 && msg.Code() == codes.GET {
-		return "", nil
-	}
 	authKey, err := msg.Options().GetString(message.URIQuery)
 	if err != nil {
 		return "", err
