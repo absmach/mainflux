@@ -1,7 +1,7 @@
 // Copyright (c) Abstract Machines
 // SPDX-License-Identifier: Apache-2.0
 
-package tracing
+package middleware
 
 import (
 	"context"
@@ -28,8 +28,8 @@ type tracingServiceMiddleware struct {
 	svc    coap.Service
 }
 
-// New creates a new instance of TracingServiceMiddleware that wraps an existing CoAP service with tracing capabilities.
-func New(tracer trace.Tracer, svc coap.Service) coap.Service {
+// TracingMiddleware creates a new instance of TracingServiceMiddleware that wraps an existing CoAP service with tracing capabilities.
+func TracingMiddleware(tracer trace.Tracer, svc coap.Service) coap.Service {
 	return &tracingServiceMiddleware{
 		tracer: tracer,
 		svc:    svc,

@@ -145,7 +145,7 @@ func main() {
 
 	svc := coap.New(clientsClient, channelsClient, nps)
 
-	svc = tracing.New(tracer, svc)
+	svc = middleware.TracingMiddleware(tracer, svc)
 
 	svc = httpapi.LoggingMiddleware(svc, logger)
 

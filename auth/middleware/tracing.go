@@ -1,7 +1,7 @@
 // Copyright (c) Abstract Machines
 // SPDX-License-Identifier: Apache-2.0
 
-package tracing
+package middleware
 
 import (
 	"context"
@@ -21,8 +21,8 @@ type tracingMiddleware struct {
 	svc    auth.Service
 }
 
-// New returns a new group service with tracing capabilities.
-func New(svc auth.Service, tracer trace.Tracer) auth.Service {
+// TracingMiddleware returns a new auth service with tracing capabilities.
+func TracingMiddleware(svc auth.Service, tracer trace.Tracer) auth.Service {
 	return &tracingMiddleware{tracer, svc}
 }
 
