@@ -43,7 +43,6 @@ import (
 	"github.com/absmach/supermq/users/hasher"
 	"github.com/absmach/supermq/users/middleware"
 	"github.com/absmach/supermq/users/postgres"
-	"github.com/absmach/supermq/users/tracing"
 	"github.com/authzed/authzed-go/v1"
 	"github.com/authzed/grpcutil"
 	"github.com/caarlos0/env/v11"
@@ -276,10 +275,10 @@ func newService(ctx context.Context, authz smqauthz.Authorization, token grpcTok
 	}
 	svc = middleware.AuthorizationMiddleware(svc, authz, c.SelfRegister)
 
-	svc = tracing.New(svc, tracer)
-	svc = middleware.LoggingMiddleware(svc, logger)
+	svc = middleware.Tracing(svc, tracer)
+	svc = middleware.Logging(svc, logger)
 	counter, latency := prometheus.MakeMetrics(svcName, "api")
-	svc = middleware.MetricsMiddleware(svc, counter, latency)
+	svc = middleware.Metrics(svc, counter, latency)
 
 	userID, err := createAdmin(ctx, c, repo, hsr, svc)
 	if err != nil {

@@ -31,7 +31,7 @@ import (
 	"github.com/absmach/supermq/pkg/uuid"
 	"github.com/absmach/supermq/ws"
 	httpapi "github.com/absmach/supermq/ws/api"
-	"github.com/absmach/supermq/ws/tracing"
+	"github.com/absmach/supermq/ws/middleware"
 	"github.com/caarlos0/env/v11"
 	"go.opentelemetry.io/otel/trace"
 	"golang.org/x/sync/errgroup"
@@ -193,10 +193,10 @@ func main() {
 
 func newService(clientsClient grpcClientsV1.ClientsServiceClient, channels grpcChannelsV1.ChannelsServiceClient, nps messaging.PubSub, logger *slog.Logger, tracer trace.Tracer) ws.Service {
 	svc := ws.New(clientsClient, channels, nps)
-	svc = tracing.New(tracer, svc)
-	svc = httpapi.LoggingMiddleware(svc, logger)
+	svc = middleware.Tracing(tracer, svc)
+	svc = middleware.Logging(svc, logger)
 	counter, latency := prometheus.MakeMetrics("ws_adapter", "api")
-	svc = httpapi.MetricsMiddleware(svc, counter, latency)
+	svc = middleware.Metrics(svc, counter, latency)
 	return svc
 }
 
