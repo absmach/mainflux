@@ -514,13 +514,8 @@ func (svc service) UpdatePATDescription(ctx context.Context, token, patID, descr
 	return pat, nil
 }
 
-func (svc service) RetrievePAT(ctx context.Context, token, patID string) (PAT, error) {
-	key, err := svc.Identify(ctx, token)
-	if err != nil {
-		return PAT{}, err
-	}
-
-	pat, err := svc.pats.Retrieve(ctx, key.User, patID)
+func (svc service) RetrievePAT(ctx context.Context, userID, patID string) (PAT, error) {
+	pat, err := svc.pats.Retrieve(ctx, userID, patID)
 	if err != nil {
 		return PAT{}, errors.Wrap(errRetrievePAT, err)
 	}
