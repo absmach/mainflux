@@ -15,8 +15,6 @@ import (
 	"github.com/absmach/supermq/pkg/roles"
 )
 
-const emptyDomain = ""
-
 var _ clients.Service = (*patMiddleware)(nil)
 
 type patMiddleware struct {
@@ -31,7 +29,6 @@ func PATMiddleware(svc clients.Service, pat smqpat.Authorization) clients.Servic
 	}
 }
 
-// authorizePAT validates Personal Access Token if present in the session
 func (pm *patMiddleware) authorizePAT(ctx context.Context, session authn.Session, platformEntityType smqauth.PlatformEntityType, optionalDomainEntityType smqauth.DomainEntityType, OptionalDomainID string, operation smqauth.OperationType, entityIDs []string) error {
 	if session.Type != authn.PersonalAccessToken {
 		return nil

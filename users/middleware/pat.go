@@ -25,7 +25,6 @@ type patMiddleware struct {
 	pat smqpat.Authorization
 }
 
-// PATMiddleware adds PAT validation to the users service.
 func PATMiddleware(svc users.Service, pat smqpat.Authorization) users.Service {
 	return &patMiddleware{
 		svc: svc,
@@ -33,7 +32,6 @@ func PATMiddleware(svc users.Service, pat smqpat.Authorization) users.Service {
 	}
 }
 
-// authorizePAT validates Personal Access Token if present in the session
 func (pm *patMiddleware) authorizePAT(ctx context.Context, session authn.Session, platformEntityType smqauth.PlatformEntityType, optionalDomainEntityType smqauth.DomainEntityType, OptionalDomainID string, operation smqauth.OperationType, entityIDs []string) error {
 	if session.Type != authn.PersonalAccessToken {
 		return nil
