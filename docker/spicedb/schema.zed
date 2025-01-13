@@ -310,7 +310,16 @@ definition domain {
 	permission remove_role_users_permission = remove_role_users + team->domain_remove_role_users + organization->admin
 	permission view_role_users_permission = view_role_users + team->domain_view_role_users + organization->admin
 
-	permission membership = read + update + enable + disable + delete + manage_role + add_role_users + remove_role_users + view_role_users
+	permission membership = read + update + enable + disable + delete +
+	manage_role + add_role_users + remove_role_users + view_role_users +
+	client_create + channel_create + group_create +
+	client_update + client_read + client_delete + client_set_parent_group + client_connect_to_channel +
+	client_manage_role + client_add_role_users + client_remove_role_users + client_view_role_users +
+	channel_update + channel_read + channel_delete + channel_set_parent_group + channel_connect_to_client + channel_publish + channel_subscribe +
+	channel_manage_role + channel_add_role_users + channel_remove_role_users + channel_view_role_users +
+	group_update + group_membership + group_read + group_delete + group_set_child + group_set_parent +
+	group_manage_role + group_add_role_users + group_remove_role_users + group_view_role_users
+
 	permission admin = read & update & enable & disable & delete & manage_role & add_role_users & remove_role_users & view_role_users
 
 	permission client_create_permission = client_create + team->client_create + organization->admin
@@ -355,7 +364,7 @@ definition domain {
 
 }
 
-// Add this realtion and permission in future while adding orgnaization
+// Add this relation and permission in future while adding organization
 definition team {
 	relation organization: organization
 	relation parent_team: team

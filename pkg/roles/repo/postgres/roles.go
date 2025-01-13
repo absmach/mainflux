@@ -103,7 +103,7 @@ type dbRoleMember struct {
 func toDBRoles(role roles.Role) dbRole {
 	var createdBy *string
 	if role.CreatedBy != "" {
-		createdBy = &role.UpdatedBy
+		createdBy = &role.CreatedBy
 	}
 	var createdAt sql.NullTime
 	if role.CreatedAt != (time.Time{}) && !role.CreatedAt.IsZero() {

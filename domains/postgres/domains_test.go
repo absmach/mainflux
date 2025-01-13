@@ -561,7 +561,7 @@ func TestUpdate(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.desc, func(t *testing.T) {
-			d, err := repo.Update(context.Background(), tc.domainID, userID, tc.d)
+			d, err := repo.Update(context.Background(), tc.domainID, tc.d)
 			d.UpdatedAt = tc.response.UpdatedAt
 			assert.Equal(t, tc.response, d, fmt.Sprintf("%s: expected %v got %v\n", tc.desc, tc.response, d))
 			assert.True(t, errors.Contains(err, tc.err), fmt.Sprintf("%s: expected %s got %s\n", tc.desc, tc.err, err))

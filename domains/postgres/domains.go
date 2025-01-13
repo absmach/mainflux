@@ -294,41 +294,46 @@ func (repo domainRepo) ListDomains(ctx context.Context, pm domains.Page) (domain
 }
 
 // Update updates the client name and metadata.
-func (repo domainRepo) Update(ctx context.Context, id, userID string, dr domains.DomainReq) (domains.Domain, error) {
+func (repo domainRepo) Update(ctx context.Context, id string, dr domains.DomainReq) (domains.Domain, error) {
 	var query []string
 	var upq string
-	var ws string = "AND status = :status"
 	d := domains.Domain{ID: id}
 	if dr.Name != nil && *dr.Name != "" {
-		query = append(query, "name = :name, ")
+		query = append(query, "name = :name")
 		d.Name = *dr.Name
 	}
 	if dr.Metadata != nil {
-		query = append(query, "metadata = :metadata, ")
+		query = append(query, "metadata = :metadata")
 		d.Metadata = *dr.Metadata
 	}
 	if dr.Tags != nil {
-		query = append(query, "tags = :tags, ")
+		query = append(query, "tags = :tags")
 		d.Tags = *dr.Tags
 	}
 	if dr.Status != nil {
-		ws = ""
-		query = append(query, "status = :status, ")
+		query = append(query, "status = :status")
 		d.Status = *dr.Status
 	}
 	if dr.Alias != nil {
-		query = append(query, "alias = :alias, ")
+		query = append(query, "alias = :alias")
 		d.Alias = *dr.Alias
 	}
 	d.UpdatedAt = time.Now()
-	d.UpdatedBy = userID
-	if len(query) > 0 {
-		upq = strings.Join(query, " ")
+	if dr.UpdatedAt != nil {
+		query = append(query, "updated_at = :updated_at")
+		d.UpdatedAt = *dr.UpdatedAt
 	}
-	q := fmt.Sprintf(`UPDATE domains SET %s  updated_at = :updated_at, updated_by = :updated_by
-        WHERE id = :id %s
+	if dr.UpdatedBy != nil {
+		query = append(query, "updated_by = :updated_by")
+		d.UpdatedAt = *dr.UpdatedAt
+	}
+	if len(query) > 0 {
+		upq = strings.Join(query, ", ")
+	}
+	q := fmt.Sprintf(`UPDATE domains SET %s
+        WHERE id = :id
         RETURNING id, name, tags, alias, metadata, created_at, updated_at, updated_by, created_by, status;`,
-		upq, ws)
+		upq)
 
 	dbd, err := toDBDomain(d)
 	if err != nil {
