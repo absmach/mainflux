@@ -721,106 +721,172 @@ func (repo groupRepository) retrieveGroups(ctx context.Context, domainID, userID
 
 func (repo groupRepository) userGroupsBaseQuery(domainID, userID string) string {
 	return fmt.Sprintf(`
-	WITH direct_groups AS (
+WITH direct_groups AS (
+SELECT
+	g.*,
+	gr.entity_id AS entity_id,
+	grm.member_id AS member_id,
+	gr.id AS role_id,
+	gr."name" AS role_name,
+	array_agg(gra."action") AS actions
+FROM
+	groups_role_members grm
+JOIN
+	groups_role_actions gra ON gra.role_id = grm.role_id
+JOIN
+	groups_roles gr ON gr.id = grm.role_id
+JOIN
+	"groups" g ON g.id = gr.entity_id
+WHERE
+	grm.member_id = '%s'
+	AND g.domain_id = '%s'
+GROUP BY
+	gr.entity_id, grm.member_id, gr.id, gr."name", g."path", g.id
+),
+direct_groups_with_subgroup AS (
 	SELECT
-		g.*,
-		gr.entity_id AS entity_id,
-		grm.member_id AS member_id,
-		gr.id AS role_id,
-		gr."name" AS role_name,
-		array_agg(gra."action") AS actions
+		*
+	FROM direct_groups
+	WHERE EXISTS (
+		SELECT 1
+			FROM unnest(direct_groups.actions) AS action
+		WHERE action LIKE 'subgroup_%%'
+	)
+),
+indirect_child_groups AS (
+	SELECT
+		DISTINCT  indirect_child_groups.id as child_id,
+		indirect_child_groups.*,
+		dgws.id as access_provider_id,
+		dgws.role_id as access_provider_role_id,
+		dgws.role_name as access_provider_role_name,
+		dgws.actions as access_provider_role_actions
 	FROM
-		groups_role_members grm
+		direct_groups_with_subgroup dgws
 	JOIN
-		groups_role_actions gra ON gra.role_id = grm.role_id
-	JOIN
-		groups_roles gr ON gr.id = grm.role_id
-	JOIN
-		"groups" g ON g.id = gr.entity_id
+		groups indirect_child_groups ON indirect_child_groups.path <@ dgws.path  -- Finds all children of entity_id based on ltree path
 	WHERE
-		grm.member_id = '%s'
-		AND g.domain_id = '%s'
-	GROUP BY
-		gr.entity_id, grm.member_id, gr.id, gr."name", g."path", g.id
-	),
-	direct_groups_with_subgroup AS (
-		SELECT
-			*
-		FROM direct_groups
-		WHERE EXISTS (
-    		SELECT 1
-    			FROM unnest(direct_groups.actions) AS action
-    		WHERE action LIKE 'subgroup_%%'
+		indirect_child_groups.domain_id = '%s'
+		AND
+		NOT EXISTS (  -- Ensures that the indirect_child_groups.id is not already in the direct_groups_with_subgroup table
+			SELECT 1
+			FROM direct_groups_with_subgroup dgws
+			WHERE dgws.id = indirect_child_groups.id
 		)
-	),
-	indirect_child_groups AS (
-		SELECT
-			DISTINCT  indirect_child_groups.id as child_id,
-			indirect_child_groups.*,
-			dgws.id as access_provider_id,
-			dgws.role_id as access_provider_role_id,
-			dgws.role_name as access_provider_role_name,
-			dgws.actions as access_provider_role_actions
-		FROM
-			direct_groups_with_subgroup dgws
-		JOIN
-			groups indirect_child_groups ON indirect_child_groups.path <@ dgws.path  -- Finds all children of entity_id based on ltree path
-		WHERE
-			indirect_child_groups.domain_id = '%s'
-			AND
-			NOT EXISTS (  -- Ensures that the indirect_child_groups.id is not already in the direct_groups_with_subgroup table
-				SELECT 1
-				FROM direct_groups_with_subgroup dgws
-				WHERE dgws.id = indirect_child_groups.id
-			)
-	),
-	final_groups as (
-		SELECT
-			id,
-			parent_id,
-			domain_id,
-			"name",
-			description,
-			metadata,
-			created_at,
-			updated_at,
-			updated_by,
-			status,
-			"path",
-			role_id,
-			role_name,
-			actions,
-			'direct' AS access_type,
-			'' AS access_provider_id,
-			'' AS access_provider_role_id,
-			'' AS access_provider_role_name,
-			array[]::::text[] AS access_provider_role_actions
-		FROM
-			direct_groups
-		UNION
-		SELECT
-			id,
-			parent_id,
-			domain_id,
-			"name",
-			description,
-			metadata,
-			created_at,
-			updated_at,
-			updated_by,
-			status,
-			"path",
-			'' AS role_id,
-			'' AS role_name,
-			array[]::::text[] AS actions,
-			'indirect' AS access_type,
-			access_provider_id,
-			access_provider_role_id,
-			access_provider_role_name,
-			access_provider_role_actions
-		FROM
-			indirect_child_groups
-	)`, userID, domainID, domainID)
+),
+direct_indirect_groups as (
+	SELECT
+		id,
+		parent_id,
+		domain_id,
+		"name",
+		description,
+		metadata,
+		created_at,
+		updated_at,
+		updated_by,
+		status,
+		"path",
+		role_id,
+		role_name,
+		actions,
+		'direct' AS access_type,
+		'' AS access_provider_id,
+		'' AS access_provider_role_id,
+		'' AS access_provider_role_name,
+		array[]::::text[] AS access_provider_role_actions
+	FROM
+		direct_groups
+	UNION
+	SELECT
+		id,
+		parent_id,
+		domain_id,
+		"name",
+		description,
+		metadata,
+		created_at,
+		updated_at,
+		updated_by,
+		status,
+		"path",
+		'' AS role_id,
+		'' AS role_name,
+		array[]::::text[] AS actions,
+		'indirect' AS access_type,
+		access_provider_id,
+		access_provider_role_id,
+		access_provider_role_name,
+		access_provider_role_actions
+	FROM
+		indirect_child_groups
+),
+final_groups AS (
+	SELECT
+		dig.id,
+		dig.parent_id,
+		dig.domain_id,
+		dig."name",
+		dig.description,
+		dig.metadata,
+		dig.created_at,
+		dig.updated_at,
+		dig.updated_by,
+		dig.status,
+		dig."path",
+		dig.role_id,
+		dig.role_name,
+		dig.actions,
+		dig.access_type,
+		dig.access_provider_id,
+		dig.access_provider_role_id,
+		dig.access_provider_role_name,
+		dig.access_provider_role_actions
+	FROM
+		direct_indirect_groups as dig
+	UNION
+	SELECT
+		dg.id,
+		dg.parent_id,
+		dg.domain_id,
+		dg."name",
+		dg.description,
+		dg.metadata,
+		dg.created_at,
+		dg.updated_at,
+		dg.updated_by,
+		dg.status,
+		dg."path",
+		'' AS role_id,
+		'' AS role_name,
+		array[]::::text[] AS actions,
+		'domain' AS access_type,
+		d.id AS access_provider_id,
+		dr.id AS access_provider_role_id,
+		dr."name" AS access_provider_role_name,
+		array_agg(dra."action") as actions
+	FROM
+		domains_role_members drm
+	JOIN
+		domains_role_actions dra ON dra.role_id = drm.role_id
+	JOIN
+		domains_roles dr ON dr.id = drm.role_id
+	JOIN
+		domains d ON d.id = dr.entity_id
+	JOIN
+		"groups" dg ON dg.domain_id = d.id
+	WHERE
+		drm.member_id = '%s' -- user_id
+	 	AND d.id = '%s' -- domain_id
+	 	AND dra."action" LIKE 'group_%%'
+	 	AND NOT EXISTS (  -- Ensures that the direct and indirect groups are not in included.
+			SELECT 1 FROM direct_indirect_groups dig
+			WHERE dig.id = dg.id
+		)
+	 GROUP BY
+		dg.id, d.id, dr.id
+)
+		`, userID, domainID, domainID, userID, domainID)
 }
 
 func buildQuery(gm groups.PageMeta, ids ...string) string {

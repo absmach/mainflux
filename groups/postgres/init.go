@@ -4,6 +4,7 @@
 package postgres
 
 import (
+	dpostgres "github.com/absmach/supermq/domains/postgres"
 	"github.com/absmach/supermq/pkg/errors"
 	repoerr "github.com/absmach/supermq/pkg/errors/repository"
 	rolesPostgres "github.com/absmach/supermq/pkg/roles/repo/postgres"
@@ -58,6 +59,12 @@ func Migration() (*migrate.MemoryMigrationSource, error) {
 	}
 
 	groupsMigration.Migrations = append(groupsMigration.Migrations, rolesMigration.Migrations...)
+
+	domainsMigrations, err := dpostgres.Migration()
+	if err != nil {
+		return nil, err
+	}
+	groupsMigration.Migrations = append(groupsMigration.Migrations, domainsMigrations.Migrations...)
 
 	return groupsMigration, nil
 }

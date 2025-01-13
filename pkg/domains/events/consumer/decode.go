@@ -68,7 +68,7 @@ func ToDomains(data map[string]interface{}) (domains.Domain, error) {
 
 	cby, ok := data["created_by"].(string)
 	if !ok {
-		return domains.Domain{}, errCreatedAt
+		return domains.Domain{}, errCreatedBy
 	}
 	d.CreatedBy = cby
 
