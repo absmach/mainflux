@@ -816,7 +816,6 @@ func TestUpdateDomain(t *testing.T) {
 				contentType: tc.contentType,
 				token:       tc.token,
 			}
-			fmt.Println("req url", req.url)
 
 			if tc.token == validToken {
 				tc.session = authn.Session{UserID: userID, DomainID: tc.domainID, DomainUserID: tc.domainID + "_" + userID}

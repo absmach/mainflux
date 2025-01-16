@@ -28,6 +28,7 @@ import (
 	jaegerclient "github.com/absmach/supermq/pkg/jaeger"
 	"github.com/absmach/supermq/pkg/oauth2"
 	googleoauth "github.com/absmach/supermq/pkg/oauth2/google"
+	authsvcPat "github.com/absmach/supermq/pkg/pat"
 	"github.com/absmach/supermq/pkg/policies"
 	"github.com/absmach/supermq/pkg/policies/spicedb"
 	pg "github.com/absmach/supermq/pkg/postgres"
@@ -205,6 +206,15 @@ func main() {
 	defer authzHandler.Close()
 	logger.Info("AuthZ successfully connected to auth gRPC server " + authzHandler.Secure())
 
+	pat, patHandler, err := authsvcPat.NewAuthorization(ctx, authClientConfig)
+	if err != nil {
+		logger.Error("failed to create authz " + err.Error())
+		exitCode = 1
+		return
+	}
+	defer patHandler.Close()
+	logger.Info("PAT successfully connected to auth gRPC server " + patHandler.Secure())
+
 	policyService, err := newPolicyService(cfg, logger)
 	if err != nil {
 		logger.Error("failed to create new policies service " + err.Error())
@@ -213,7 +223,7 @@ func main() {
 	}
 	logger.Info("Policy client successfully connected to spicedb gRPC server")
 
-	csvc, err := newService(ctx, authz, tokenClient, policyService, domainsClient, db, dbConfig, tracer, cfg, ec, logger)
+	csvc, err := newService(ctx, authz, pat, tokenClient, policyService, domainsClient, db, dbConfig, tracer, cfg, ec, logger)
 	if err != nil {
 		logger.Error(fmt.Sprintf("failed to setup service: %s", err))
 		exitCode = 1
@@ -256,7 +266,7 @@ func main() {
 	}
 }
 
-func newService(ctx context.Context, authz smqauthz.Authorization, token grpcTokenV1.TokenServiceClient, policyService policies.Service, domainsClient grpcDomainsV1.DomainsServiceClient, db *sqlx.DB, dbConfig pgclient.Config, tracer trace.Tracer, c config, ec email.Config, logger *slog.Logger) (users.Service, error) {
+func newService(ctx context.Context, authz smqauthz.Authorization, pat authsvcPat.Authorization, token grpcTokenV1.TokenServiceClient, policyService policies.Service, domainsClient grpcDomainsV1.DomainsServiceClient, db *sqlx.DB, dbConfig pgclient.Config, tracer trace.Tracer, c config, ec email.Config, logger *slog.Logger) (users.Service, error) {
 	database := pg.NewDatabase(db, dbConfig, tracer)
 	idp := uuid.New()
 	hsr := hasher.New()
@@ -274,6 +284,7 @@ func newService(ctx context.Context, authz smqauthz.Authorization, token grpcTok
 	if err != nil {
 		return nil, err
 	}
+	svc = middleware.PATMiddleware(svc, pat)
 	svc = middleware.AuthorizationMiddleware(svc, authz, c.SelfRegister)
 
 	svc = tracing.New(svc, tracer)

@@ -35,24 +35,6 @@ func (_m *Authorization) Authorize(ctx context.Context, pr authz.PolicyReq) erro
 	return r0
 }
 
-// AuthorizePAT provides a mock function with given fields: ctx, pr
-func (_m *Authorization) AuthorizePAT(ctx context.Context, pr authz.PatReq) error {
-	ret := _m.Called(ctx, pr)
-
-	if len(ret) == 0 {
-		panic("no return value specified for AuthorizePAT")
-	}
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, authz.PatReq) error); ok {
-		r0 = rf(ctx, pr)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
 // NewAuthorization creates a new instance of Authorization. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
 // The first argument is typically a *testing.T value.
 func NewAuthorization(t interface {
