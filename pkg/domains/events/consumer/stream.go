@@ -12,6 +12,7 @@ import (
 	"github.com/absmach/supermq/pkg/errors"
 	"github.com/absmach/supermq/pkg/events"
 	"github.com/absmach/supermq/pkg/events/store"
+	"github.com/absmach/supermq/pkg/messaging"
 	rconsumer "github.com/absmach/supermq/pkg/roles/rolemanager/events/consumer"
 )
 
@@ -60,10 +61,11 @@ func DomainsEventsSubscribe(ctx context.Context, repo domains.Repository, esURL,
 	}
 
 	subConfig := events.SubscriberConfig{
-		Stream:   stream,
-		Consumer: esConsumerName,
-		Handler:  NewEventHandler(repo),
-		Ordered:  true,
+		Stream:         stream,
+		Consumer:       esConsumerName,
+		Handler:        NewEventHandler(repo),
+		DeliveryPolicy: messaging.DeliverNewPolicy,
+		Ordered:        true,
 	}
 	return subscriber.Subscribe(ctx, subConfig)
 }
