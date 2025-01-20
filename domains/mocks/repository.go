@@ -611,9 +611,9 @@ func (_m *Repository) Save(ctx context.Context, d domains.Domain) (domains.Domai
 	return r0, r1
 }
 
-// Update provides a mock function with given fields: ctx, id, userID, d
-func (_m *Repository) Update(ctx context.Context, id string, userID string, d domains.DomainReq) (domains.Domain, error) {
-	ret := _m.Called(ctx, id, userID, d)
+// Update provides a mock function with given fields: ctx, id, d
+func (_m *Repository) Update(ctx context.Context, id string, d domains.DomainReq) (domains.Domain, error) {
+	ret := _m.Called(ctx, id, d)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Update")
@@ -621,17 +621,17 @@ func (_m *Repository) Update(ctx context.Context, id string, userID string, d do
 
 	var r0 domains.Domain
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, string, domains.DomainReq) (domains.Domain, error)); ok {
-		return rf(ctx, id, userID, d)
+	if rf, ok := ret.Get(0).(func(context.Context, string, domains.DomainReq) (domains.Domain, error)); ok {
+		return rf(ctx, id, d)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string, string, domains.DomainReq) domains.Domain); ok {
-		r0 = rf(ctx, id, userID, d)
+	if rf, ok := ret.Get(0).(func(context.Context, string, domains.DomainReq) domains.Domain); ok {
+		r0 = rf(ctx, id, d)
 	} else {
 		r0 = ret.Get(0).(domains.Domain)
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, string, string, domains.DomainReq) error); ok {
-		r1 = rf(ctx, id, userID, d)
+	if rf, ok := ret.Get(1).(func(context.Context, string, domains.DomainReq) error); ok {
+		r1 = rf(ctx, id, d)
 	} else {
 		r1 = ret.Error(1)
 	}

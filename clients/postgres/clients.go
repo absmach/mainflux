@@ -372,224 +372,244 @@ func (repo *clientRepo) retrieveClients(ctx context.Context, domainID, userID st
 
 func (repo *clientRepo) userClientBaseQuery(domainID, userID string) string {
 	return fmt.Sprintf(`
-						WITH direct_clients AS (
-							SELECT
-								c.id,
-								c.name,
-								c.domain_id,
-								c.parent_group_id,
-								c.identity,
-								c.secret,
-								c.tags,
-								c.metadata,
-								c.created_at,
-								c.updated_at,
-								c.updated_by,
-								c.status,
-								text2ltree('') as parent_group_path,
-								cr.id AS role_id,
-								cr."name" AS role_name,
-								array_agg(cra."action") AS actions,
-								'direct' as access_type,
-								'' AS access_provider_id,
-								'' AS access_provider_role_id,
-								'' AS access_provider_role_name,
-								array[]::::text[] AS access_provider_role_actions
-							FROM
-								clients_role_members crm
-							JOIN
-								clients_role_actions cra ON cra.role_id = crm.role_id
-							JOIN
-								clients_roles cr ON cr.id = crm.role_id
-							JOIN
-								clients c ON c.id = cr.entity_id
-							WHERE
-								crm.member_id = '%s'
-								AND c.domain_id = '%s'
-							GROUP BY
-								cr.entity_id, crm.member_id, cr.id, cr."name", c.id
-						),
-						direct_groups AS (
-							SELECT
-								g.*,
-								gr.entity_id AS entity_id,
-								grm.member_id AS member_id,
-								gr.id AS role_id,
-								gr."name" AS role_name,
-								array_agg(gra."action") AS actions
-							FROM
-								groups_role_members grm
-							JOIN
-								groups_role_actions gra ON gra.role_id = grm.role_id
-							JOIN
-								groups_roles gr ON gr.id = grm.role_id
-							JOIN
-								"groups" g ON g.id = gr.entity_id
-							WHERE
-								grm.member_id = '%s'
-								AND g.domain_id = '%s'
-							GROUP BY
-								gr.entity_id, grm.member_id, gr.id, gr."name", g."path", g.id
-						),
-						direct_groups_with_subgroup AS (
-							SELECT
-								*
-							FROM direct_groups
-							WHERE EXISTS (
-								SELECT 1
-								FROM unnest(direct_groups.actions) AS action
-								WHERE action LIKE 'subgroup_%%'
-							)
-						),
-						indirect_child_groups AS (
-							SELECT
-								DISTINCT indirect_child_groups.id as child_id,
-								indirect_child_groups.*,
-								dgws.id as access_provider_id,
-								dgws.role_id as access_provider_role_id,
-								dgws.role_name as access_provider_role_name,
-								dgws.actions as access_provider_role_actions
-							FROM
-								direct_groups_with_subgroup dgws
-							JOIN
-								groups indirect_child_groups ON indirect_child_groups.path <@ dgws.path
-							WHERE
-								indirect_child_groups.domain_id = '%s'
-								AND NOT EXISTS (
-									SELECT 1
-									FROM direct_groups_with_subgroup dgws
-									WHERE dgws.id = indirect_child_groups.id
-								)
-						),
-						final_groups AS (
-							SELECT
-								id,
-								parent_id,
-								domain_id,
-								"name",
-								description,
-								metadata,
-								created_at,
-								updated_at,
-								updated_by,
-								status,
-								"path",
-								role_id,
-								role_name,
-								actions,
-								'direct_group' AS access_type,
-								'' AS access_provider_id,
-								'' AS access_provider_role_id,
-								'' AS access_provider_role_name,
-								array[]::::text[] AS access_provider_role_actions
-							FROM
-								direct_groups
-							UNION
-							SELECT
-								id,
-								parent_id,
-								domain_id,
-								"name",
-								description,
-								metadata,
-								created_at,
-								updated_at,
-								updated_by,
-								status,
-								"path",
-								'' AS role_id,
-								'' AS role_name,
-								array[]::::text[] AS actions,
-								'indirect_group' AS access_type,
-								access_provider_id,
-								access_provider_role_id,
-								access_provider_role_name,
-								access_provider_role_actions
-							FROM
-								indirect_child_groups
-						),
-						group_direct_clients AS (
-							SELECT
-								c.id,
-								c.name,
-								c.domain_id,
-								c.parent_group_id,
-								c.identity,
-								c.secret,
-								c.tags,
-								c.metadata,
-								c.created_at,
-								c.updated_at,
-								c.updated_by,
-								c.status,
-								g.path AS parent_group_path,
-								g.role_id,
-								g.role_name,
-								g.actions,
-								g.access_type,
-								g.access_provider_id,
-								g.access_provider_role_id,
-								g.access_provider_role_name,
-								g.access_provider_role_actions
-							FROM
-								final_groups g
-							JOIN
-								clients c ON c.parent_group_id = g.id
-							WHERE
-								c.id NOT IN (SELECT id FROM direct_clients)
-							UNION
-							SELECT
-								dc.id,
-								dc.name,
-								dc.domain_id,
-								dc.parent_group_id,
-								dc.identity,
-								dc.secret,
-								dc.tags,
-								dc.metadata,
-								dc.created_at,
-								dc.updated_at,
-								dc.updated_by,
-								dc.status,
-								dc.parent_group_path,
-								dc.role_id,
-								dc.role_name,
-								dc.actions,
-								dc.access_type,
-								dc.access_provider_id,
-								dc.access_provider_role_id,
-								dc.access_provider_role_name,
-								dc.access_provider_role_actions
-							FROM
-								direct_clients AS dc
-						),
-						final_clients AS (
-							SELECT
-								gdc.id,
-								gdc.name,
-								gdc.domain_id,
-								gdc.parent_group_id,
-								gdc.identity,
-								gdc.secret,
-								gdc.tags,
-								gdc.metadata,
-								gdc.created_at,
-								gdc.updated_at,
-								gdc.updated_by,
-								gdc.status,
-								gdc.parent_group_path,
-								gdc.role_id,
-								gdc.role_name,
-								gdc.actions,
-								gdc.access_type,
-								gdc.access_provider_id,
-								gdc.access_provider_role_id,
-								gdc.access_provider_role_name,
-								gdc.access_provider_role_actions
-							FROM
-								group_direct_clients AS gdc
-						)
-	`, userID, domainID, userID, domainID, domainID)
+	WITH direct_clients AS (
+		SELECT
+			c.id,
+			c.name,
+			c.domain_id,
+			c.parent_group_id,
+			c.tags,
+			c.metadata,
+			c.identity,
+			c.secret,
+			c.created_at,
+			c.updated_at,
+			c.updated_by,
+			c.status,
+			text2ltree('') as parent_group_path,
+			cr.id AS role_id,
+			cr."name" AS role_name,
+			array_agg(cra."action") AS actions,
+			'direct' as access_type,
+			'' AS access_provider_id,
+			'' AS access_provider_role_id,
+			'' AS access_provider_role_name,
+			array[]::::text[] AS access_provider_role_actions
+		FROM
+			clients_role_members crm
+		JOIN
+			clients_role_actions cra ON cra.role_id = crm.role_id
+		JOIN
+			clients_roles cr ON cr.id = crm.role_id
+		JOIN
+			clients c ON c.id = cr.entity_id
+		WHERE
+			crm.member_id = '%s'
+			AND c.domain_id = '%s'
+		GROUP BY
+			cr.entity_id, crm.member_id, cr.id, cr."name", c.id
+	),
+	direct_groups AS (
+		SELECT
+			g.*,
+			gr.entity_id AS entity_id,
+			grm.member_id AS member_id,
+			gr.id AS role_id,
+			gr."name" AS role_name,
+			array_agg(gra."action") AS actions
+		FROM
+			groups_role_members grm
+		JOIN
+			groups_role_actions gra ON gra.role_id = grm.role_id
+		JOIN
+			groups_roles gr ON gr.id = grm.role_id
+		JOIN
+			"groups" g ON g.id = gr.entity_id
+		WHERE
+			grm.member_id = '%s'
+			AND g.domain_id = '%s'
+		GROUP BY
+			gr.entity_id, grm.member_id, gr.id, gr."name", g."path", g.id
+	),
+	direct_groups_with_subgroup AS (
+		SELECT
+			*
+		FROM direct_groups
+		WHERE EXISTS (
+			SELECT 1
+			FROM unnest(direct_groups.actions) AS action
+			WHERE action LIKE 'subgroup_%%'
+		)
+	),
+	indirect_child_groups AS (
+		SELECT
+			DISTINCT indirect_child_groups.id as child_id,
+			indirect_child_groups.*,
+			dgws.id as access_provider_id,
+			dgws.role_id as access_provider_role_id,
+			dgws.role_name as access_provider_role_name,
+			dgws.actions as access_provider_role_actions
+		FROM
+			direct_groups_with_subgroup dgws
+		JOIN
+			groups indirect_child_groups ON indirect_child_groups.path <@ dgws.path
+		WHERE
+			indirect_child_groups.domain_id = '%s'
+			AND NOT EXISTS (
+				SELECT 1
+				FROM direct_groups_with_subgroup dgws
+				WHERE dgws.id = indirect_child_groups.id
+			)
+	),
+	final_groups AS (
+		SELECT
+			id,
+			parent_id,
+			domain_id,
+			"name",
+			description,
+			metadata,
+			created_at,
+			updated_at,
+			updated_by,
+			status,
+			"path",
+			'' AS role_id,
+			'' AS role_name,
+			array[]::::text[] AS actions,
+			'direct_group' AS access_type,
+			id AS access_provider_id,
+			role_id AS access_provider_role_id,
+			role_name AS access_provider_role_name,
+			actions AS access_provider_role_actions
+		FROM
+			direct_groups
+		UNION
+		SELECT
+			id,
+			parent_id,
+			domain_id,
+			"name",
+			description,
+			metadata,
+			created_at,
+			updated_at,
+			updated_by,
+			status,
+			"path",
+			'' AS role_id,
+			'' AS role_name,
+			array[]::::text[] AS actions,
+			'indirect_group' AS access_type,
+			access_provider_id,
+			access_provider_role_id,
+			access_provider_role_name,
+			access_provider_role_actions
+		FROM
+			indirect_child_groups
+	),
+	groups_clients AS (
+		SELECT
+			c.id,
+			c.name,
+			c.domain_id,
+			c.parent_group_id,
+			c.tags,
+			c.metadata,
+			c.identity,
+			c.secret,
+			c.created_at,
+			c.updated_at,
+			c.updated_by,
+			c.status,
+			g.path AS parent_group_path,
+			g.role_id,
+			g.role_name,
+			g.actions,
+			g.access_type,
+			g.access_provider_id,
+			g.access_provider_role_id,
+			g.access_provider_role_name,
+			g.access_provider_role_actions
+		FROM
+			final_groups g
+		JOIN
+			clients c ON c.parent_group_id = g.id
+		WHERE
+			c.id NOT IN (SELECT id FROM direct_clients)
+		UNION
+		SELECT	* FROM   direct_clients
+	),
+	final_clients AS (
+		SELECT
+			gc.id,
+			gc."name",
+			gc.domain_id,
+			gc.parent_group_id,
+			gc.tags,
+			gc.metadata,
+			gc.identity,
+			gc.secret,
+			gc.created_at,
+			gc.updated_at,
+			gc.updated_by,
+			gc.status,
+			gc.parent_group_path,
+			gc.role_id,
+			gc.role_name,
+			gc.actions,
+			gc.access_type,
+			gc.access_provider_id,
+			gc.access_provider_role_id,
+			gc.access_provider_role_name,
+			gc.access_provider_role_actions
+		FROM
+			groups_clients AS  gc
+		UNION
+		SELECT
+			dc.id,
+			dc."name",
+			dc.domain_id,
+			dc.parent_group_id,
+			dc.tags,
+			dc.metadata,
+			dc.identity,
+			dc.secret,
+			dc.created_at,
+			dc.updated_at,
+			dc.updated_by,
+			dc.status,
+			text2ltree('') AS parent_group_path,
+			'' AS role_id,
+			'' AS role_name,
+			array[]::::text[] AS actions,
+			'domain' AS access_type,
+			d.id AS access_provider_id,
+			dr.id AS access_provider_role_id,
+			dr."name" AS access_provider_role_name,
+			array_agg(dra."action") as access_provider_role_actions
+		FROM
+			domains_role_members drm
+		JOIN
+			domains_role_actions dra ON dra.role_id = drm.role_id
+		JOIN
+			domains_roles dr ON dr.id = drm.role_id
+		JOIN
+			domains d ON d.id = dr.entity_id
+		JOIN
+			clients dc ON dc.domain_id = d.id
+		WHERE
+			drm.member_id = '%s' -- user_id
+			 AND d.id = '%s' -- domain_id
+			 AND dra."action" LIKE 'client_%%'
+			 AND NOT EXISTS (  -- Ensures that the direct and indirect clients are not in included.
+				SELECT 1 FROM groups_clients gc
+				WHERE gc.id = dc.id
+			)
+		 GROUP BY
+			dc.id, d.id, dr.id
+	)
+	`, userID, domainID, userID, domainID, domainID, userID, domainID)
 }
 
 func (repo *clientRepo) SearchClients(ctx context.Context, pm clients.Page) (clients.ClientsPage, error) {
@@ -785,6 +805,7 @@ func ToClient(t DBClient) (clients.Client, error) {
 		UpdatedAt:                 updatedAt,
 		UpdatedBy:                 updatedBy,
 		Status:                    t.Status,
+		ParentGroupPath:           t.ParentGroupPath,
 		RoleID:                    t.RoleID,
 		RoleName:                  t.RoleName,
 		Actions:                   t.Actions,
@@ -876,7 +897,7 @@ func PageQuery(pm clients.Page) (string, error) {
 		query = append(query, "c.domain_id = :domain_id")
 	}
 	if pm.Group != "" {
-		query = append(query, "c.parent_group_path @> (SELECT path from groups where id = :group_id) ")
+		query = append(query, "c.parent_group_path <@ (SELECT path from groups where id = :group_id) ")
 	}
 	if pm.Channel != "" {
 		query = append(query, "conn.channel_id = :channel_id ")

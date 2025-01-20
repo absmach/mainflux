@@ -111,7 +111,10 @@ func (svc service) RetrieveDomain(ctx context.Context, session authn.Session, id
 }
 
 func (svc service) UpdateDomain(ctx context.Context, session authn.Session, id string, d DomainReq) (Domain, error) {
-	dom, err := svc.repo.Update(ctx, id, session.UserID, d)
+	updatedAt := time.Now()
+	d.UpdatedAt = &updatedAt
+	d.UpdatedBy = &session.UserID
+	dom, err := svc.repo.Update(ctx, id, d)
 	if err != nil {
 		return Domain{}, errors.Wrap(svcerr.ErrUpdateEntity, err)
 	}
@@ -120,7 +123,8 @@ func (svc service) UpdateDomain(ctx context.Context, session authn.Session, id s
 
 func (svc service) EnableDomain(ctx context.Context, session authn.Session, id string) (Domain, error) {
 	status := EnabledStatus
-	dom, err := svc.repo.Update(ctx, id, session.UserID, DomainReq{Status: &status})
+	updatedAt := time.Now()
+	dom, err := svc.repo.Update(ctx, id, DomainReq{Status: &status, UpdatedBy: &session.UserID, UpdatedAt: &updatedAt})
 	if err != nil {
 		return Domain{}, errors.Wrap(svcerr.ErrUpdateEntity, err)
 	}
@@ -133,7 +137,8 @@ func (svc service) EnableDomain(ctx context.Context, session authn.Session, id s
 
 func (svc service) DisableDomain(ctx context.Context, session authn.Session, id string) (Domain, error) {
 	status := DisabledStatus
-	dom, err := svc.repo.Update(ctx, id, session.UserID, DomainReq{Status: &status})
+	updatedAt := time.Now()
+	dom, err := svc.repo.Update(ctx, id, DomainReq{Status: &status, UpdatedBy: &session.UserID, UpdatedAt: &updatedAt})
 	if err != nil {
 		return Domain{}, errors.Wrap(svcerr.ErrUpdateEntity, err)
 	}
@@ -147,7 +152,8 @@ func (svc service) DisableDomain(ctx context.Context, session authn.Session, id 
 // Only SuperAdmin can freeze the domain.
 func (svc service) FreezeDomain(ctx context.Context, session authn.Session, id string) (Domain, error) {
 	status := FreezeStatus
-	dom, err := svc.repo.Update(ctx, id, session.UserID, DomainReq{Status: &status})
+	updatedAt := time.Now()
+	dom, err := svc.repo.Update(ctx, id, DomainReq{Status: &status, UpdatedBy: &session.UserID, UpdatedAt: &updatedAt})
 	if err != nil {
 		return Domain{}, errors.Wrap(svcerr.ErrUpdateEntity, err)
 	}

@@ -6,6 +6,8 @@ package events
 import (
 	"context"
 	"time"
+
+	"github.com/absmach/supermq/pkg/messaging"
 )
 
 const (
@@ -40,10 +42,11 @@ type EventHandler interface {
 
 // SubscriberConfig represents event subscriber configuration.
 type SubscriberConfig struct {
-	Consumer string
-	Stream   string
-	Handler  EventHandler
-	Ordered  bool
+	Consumer       string
+	Stream         string
+	Handler        EventHandler
+	Ordered        bool
+	DeliveryPolicy messaging.DeliveryPolicy
 }
 
 // Subscriber specifies event subscription API.

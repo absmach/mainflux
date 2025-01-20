@@ -92,7 +92,7 @@ func (es *subEventStore) Subscribe(ctx context.Context, cfg events.SubscriberCon
 			ctx:     ctx,
 			logger:  es.logger,
 		},
-		DeliveryPolicy: messaging.DeliverNewPolicy,
+		DeliveryPolicy: cfg.DeliveryPolicy,
 		Ordered:        cfg.Ordered,
 	}
 

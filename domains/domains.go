@@ -97,11 +97,13 @@ func (s *Status) UnmarshalJSON(data []byte) error {
 type Metadata map[string]interface{}
 
 type DomainReq struct {
-	Name     *string   `json:"name,omitempty"`
-	Metadata *Metadata `json:"metadata,omitempty"`
-	Tags     *[]string `json:"tags,omitempty"`
-	Alias    *string   `json:"alias,omitempty"`
-	Status   *Status   `json:"status,omitempty"`
+	Name      *string    `json:"name,omitempty"`
+	Metadata  *Metadata  `json:"metadata,omitempty"`
+	Tags      *[]string  `json:"tags,omitempty"`
+	Alias     *string    `json:"alias,omitempty"`
+	Status    *Status    `json:"status,omitempty"`
+	UpdatedBy *string    `json:"updated_by,omitempty"`
+	UpdatedAt *time.Time `json:"updated_at,omitempty"`
 }
 type Domain struct {
 	ID        string    `json:"id"`
@@ -188,7 +190,7 @@ type Repository interface {
 	RetrieveAllByIDs(ctx context.Context, pm Page) (DomainsPage, error)
 
 	// Update updates the client name and metadata.
-	Update(ctx context.Context, id string, userID string, d DomainReq) (Domain, error)
+	Update(ctx context.Context, id string, d DomainReq) (Domain, error)
 
 	// Delete
 	Delete(ctx context.Context, id string) error

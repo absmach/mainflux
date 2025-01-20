@@ -13,10 +13,6 @@ import (
 	"github.com/absmach/supermq/pkg/roles"
 )
 
-type CtxKey int
-
-const ListDomainClients CtxKey = iota
-
 type Connection struct {
 	ClientID  string
 	ChannelID string

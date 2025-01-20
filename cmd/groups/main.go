@@ -17,6 +17,7 @@ import (
 	grpcChannelsV1 "github.com/absmach/supermq/api/grpc/channels/v1"
 	grpcClientsV1 "github.com/absmach/supermq/api/grpc/clients/v1"
 	grpcGroupsV1 "github.com/absmach/supermq/api/grpc/groups/v1"
+	dpostgres "github.com/absmach/supermq/domains/postgres"
 	"github.com/absmach/supermq/groups"
 	gpsvc "github.com/absmach/supermq/groups"
 	grpcapi "github.com/absmach/supermq/groups/api/grpc"
@@ -30,6 +31,7 @@ import (
 	authsvcAuthn "github.com/absmach/supermq/pkg/authn/authsvc"
 	smqauthz "github.com/absmach/supermq/pkg/authz"
 	authsvcAuthz "github.com/absmach/supermq/pkg/authz/authsvc"
+	dconsumer "github.com/absmach/supermq/pkg/domains/events/consumer"
 	domainsAuthz "github.com/absmach/supermq/pkg/domains/grpcclient"
 	"github.com/absmach/supermq/pkg/grpcclient"
 	jaegerclient "github.com/absmach/supermq/pkg/jaeger"
@@ -77,6 +79,7 @@ type config struct {
 	JaegerURL           url.URL `env:"SMQ_JAEGER_URL"                envDefault:"http://localhost:4318/v1/traces"`
 	SendTelemetry       bool    `env:"SMQ_SEND_TELEMETRY"            envDefault:"true"`
 	ESURL               string  `env:"SMQ_ES_URL"                    envDefault:"nats://localhost:4222"`
+	ESConsumerName      string  `env:"SMQ_GROUPS_EVENT_CONSUMER"     envDefault:"groups"`
 	TraceRatio          float64 `env:"SMQ_JAEGER_TRACE_RATIO"        envDefault:"1.0"`
 	SpicedbHost         string  `env:"SMQ_SPICEDB_HOST"              envDefault:"localhost"`
 	SpicedbPort         string  `env:"SMQ_SPICEDB_PORT"              envDefault:"50051"`
@@ -222,6 +225,15 @@ func main() {
 	svc, psvc, err := newService(ctx, authz, policyService, db, dbConfig, channelsClient, clientsClient, tracer, logger, cfg)
 	if err != nil {
 		logger.Error(fmt.Sprintf("failed to setup service: %s", err))
+		exitCode = 1
+		return
+	}
+
+	ddatabase := pg.NewDatabase(db, dbConfig, tracer)
+	drepo := dpostgres.New(ddatabase)
+
+	if err := dconsumer.DomainsEventsSubscribe(ctx, drepo, cfg.ESURL, cfg.ESConsumerName, logger); err != nil {
+		logger.Error(fmt.Sprintf("failed to create domains event store : %s", err))
 		exitCode = 1
 		return
 	}
