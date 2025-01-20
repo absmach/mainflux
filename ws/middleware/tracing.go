@@ -1,7 +1,7 @@
 // Copyright (c) Abstract Machines
 // SPDX-License-Identifier: Apache-2.0
 
-package tracing
+package middleware
 
 import (
 	"context"
@@ -23,8 +23,8 @@ type tracingMiddleware struct {
 	svc    ws.Service
 }
 
-// New returns a new websocket service with tracing capabilities.
-func New(tracer trace.Tracer, svc ws.Service) ws.Service {
+// Tracing returns a new websocket service with tracing capabilities.
+func Tracing(tracer trace.Tracer, svc ws.Service) ws.Service {
 	return &tracingMiddleware{
 		tracer: tracer,
 		svc:    svc,

@@ -15,7 +15,7 @@ import (
 	"github.com/absmach/supermq"
 	"github.com/absmach/supermq/coap"
 	httpapi "github.com/absmach/supermq/coap/api"
-	"github.com/absmach/supermq/coap/tracing"
+	"github.com/absmach/supermq/coap/middleware"
 	smqlog "github.com/absmach/supermq/logger"
 	"github.com/absmach/supermq/pkg/grpcclient"
 	jaegerclient "github.com/absmach/supermq/pkg/jaeger"
@@ -145,12 +145,12 @@ func main() {
 
 	svc := coap.New(clientsClient, channelsClient, nps)
 
-	svc = tracing.New(tracer, svc)
+	svc = middleware.Tracing(tracer, svc)
 
-	svc = httpapi.LoggingMiddleware(svc, logger)
+	svc = middleware.Logging(svc, logger)
 
 	counter, latency := prometheus.MakeMetrics(svcName, "api")
-	svc = httpapi.MetricsMiddleware(svc, counter, latency)
+	svc = middleware.Metrics(svc, counter, latency)
 
 	hs := httpserver.NewServer(ctx, cancel, svcName, httpServerConfig, httpapi.MakeHandler(cfg.InstanceID), logger)
 

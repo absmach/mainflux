@@ -3,7 +3,7 @@
 
 //go:build !test
 
-package api
+package middleware
 
 import (
 	"context"
@@ -21,8 +21,8 @@ type loggingMiddleware struct {
 	svc    coap.Service
 }
 
-// LoggingMiddleware adds logging facilities to the adapter.
-func LoggingMiddleware(svc coap.Service, logger *slog.Logger) coap.Service {
+// Logging adds logging facilities to the adapter.
+func Logging(svc coap.Service, logger *slog.Logger) coap.Service {
 	return &loggingMiddleware{logger, svc}
 }
 
