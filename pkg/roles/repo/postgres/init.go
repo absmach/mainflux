@@ -36,7 +36,7 @@ func Migration(rolesTableNamePrefix, entityTableName, entityIDColumnName string)
 					fmt.Sprintf(`CREATE TABLE IF NOT EXISTS %s_role_actions (
                         role_id     VARCHAR(254) NOT NULL,
                         action   VARCHAR(254) NOT NULL,
-                        CONSTRAINT  %s_role_actions_unique_domain_role_action_constraint UNIQUE ( role_id, action),
+                        CONSTRAINT  %s_role_actions_unique_role_action_constraint UNIQUE ( role_id, action),
                         CONSTRAINT  %s_role_actions_fk_roles_id FOREIGN KEY(role_id) REFERENCES %s_roles(id) ON DELETE CASCADE
 
                     );`, rolesTableNamePrefix, rolesTableNamePrefix, rolesTableNamePrefix, rolesTableNamePrefix),

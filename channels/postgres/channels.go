@@ -947,7 +947,7 @@ func PageQuery(pm channels.PageMetadata) (string, error) {
 		query = append(query, "c.domain_id = :domain_id")
 	}
 	if pm.Group != "" {
-		query = append(query, "c.parent_group_path @> (SELECT path from groups where id = :group_id) ")
+		query = append(query, "c.parent_group_path <@ (SELECT path from groups where id = :group_id) ")
 	}
 	if pm.Client != "" {
 		query = append(query, "conn.client_id = :client_id ")

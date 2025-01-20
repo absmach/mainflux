@@ -27,12 +27,14 @@ import (
 	"github.com/absmach/supermq/clients/postgres"
 	pClients "github.com/absmach/supermq/clients/private"
 	"github.com/absmach/supermq/clients/tracing"
+	dpostgres "github.com/absmach/supermq/domains/postgres"
 	gpostgres "github.com/absmach/supermq/groups/postgres"
 	redisclient "github.com/absmach/supermq/internal/clients/redis"
 	smqlog "github.com/absmach/supermq/logger"
 	authsvcAuthn "github.com/absmach/supermq/pkg/authn/authsvc"
 	smqauthz "github.com/absmach/supermq/pkg/authz"
 	authsvcAuthz "github.com/absmach/supermq/pkg/authz/authsvc"
+	dconsumer "github.com/absmach/supermq/pkg/domains/events/consumer"
 	domainsAuthz "github.com/absmach/supermq/pkg/domains/grpcclient"
 	gconsumer "github.com/absmach/supermq/pkg/groups/events/consumer"
 	"github.com/absmach/supermq/pkg/grpcclient"
@@ -240,6 +242,15 @@ func main() {
 	svc, psvc, err := newService(ctx, db, dbConfig, authz, policyEvaluator, policyService, cacheclient, cfg.CacheKeyDuration, cfg.ESURL, channelsgRPC, groupsClient, tracer, logger)
 	if err != nil {
 		logger.Error(fmt.Sprintf("failed to create services: %s", err))
+		exitCode = 1
+		return
+	}
+
+	ddatabase := pg.NewDatabase(db, dbConfig, tracer)
+	drepo := dpostgres.New(ddatabase)
+
+	if err := dconsumer.DomainsEventsSubscribe(ctx, drepo, cfg.ESURL, cfg.ESConsumerName, logger); err != nil {
+		logger.Error(fmt.Sprintf("failed to create domains event store : %s", err))
 		exitCode = 1
 		return
 	}

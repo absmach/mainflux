@@ -805,6 +805,7 @@ func ToClient(t DBClient) (clients.Client, error) {
 		UpdatedAt:                 updatedAt,
 		UpdatedBy:                 updatedBy,
 		Status:                    t.Status,
+		ParentGroupPath:           t.ParentGroupPath,
 		RoleID:                    t.RoleID,
 		RoleName:                  t.RoleName,
 		Actions:                   t.Actions,
@@ -896,7 +897,7 @@ func PageQuery(pm clients.Page) (string, error) {
 		query = append(query, "c.domain_id = :domain_id")
 	}
 	if pm.Group != "" {
-		query = append(query, "c.parent_group_path @> (SELECT path from groups where id = :group_id) ")
+		query = append(query, "c.parent_group_path <@ (SELECT path from groups where id = :group_id) ")
 	}
 	if pm.Channel != "" {
 		query = append(query, "conn.channel_id = :channel_id ")
