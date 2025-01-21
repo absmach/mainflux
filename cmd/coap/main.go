@@ -15,6 +15,7 @@ import (
 	"github.com/absmach/supermq"
 	"github.com/absmach/supermq/coap"
 	httpapi "github.com/absmach/supermq/coap/api"
+	"github.com/absmach/supermq/coap/events"
 	"github.com/absmach/supermq/coap/tracing"
 	smqlog "github.com/absmach/supermq/logger"
 	"github.com/absmach/supermq/pkg/grpcclient"
@@ -47,6 +48,7 @@ type config struct {
 	SendTelemetry bool    `env:"SMQ_SEND_TELEMETRY"           envDefault:"true"`
 	InstanceID    string  `env:"SMQ_COAP_ADAPTER_INSTANCE_ID" envDefault:""`
 	TraceRatio    float64 `env:"SMQ_JAEGER_TRACE_RATIO"       envDefault:"1.0"`
+	ESURL         string  `env:"SMQ_ES_URL"                   envDefault:"nats://localhost:4222"`
 }
 
 func main() {
@@ -143,7 +145,14 @@ func main() {
 	defer nps.Close()
 	nps = brokerstracing.NewPubSub(coapServerConfig, tracer, nps)
 
-	svc := coap.New(clientsClient, channelsClient, nps)
+	svc := coap.New(channelsClient, nps)
+
+	svc, err = events.NewEventStoreMiddleware(ctx, svc, cfg.ESURL)
+	if err != nil {
+		logger.Error(fmt.Sprintf("failed to create event store middleware: %s", err))
+		exitCode = 1
+		return
+	}
 
 	svc = tracing.New(tracer, svc)
 
@@ -154,7 +163,7 @@ func main() {
 
 	hs := httpserver.NewServer(ctx, cancel, svcName, httpServerConfig, httpapi.MakeHandler(cfg.InstanceID), logger)
 
-	cs := coapserver.NewServer(ctx, cancel, svcName, coapServerConfig, httpapi.MakeCoAPHandler(svc, logger), logger)
+	cs := coapserver.NewServer(ctx, cancel, svcName, coapServerConfig, httpapi.MakeCoAPHandler(svc, logger, clientsClient), logger)
 
 	if cfg.SendTelemetry {
 		chc := chclient.New(svcName, supermq.Version, logger, cancel)

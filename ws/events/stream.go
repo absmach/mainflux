@@ -10,12 +10,10 @@ import (
 	"github.com/absmach/supermq/pkg/events/store"
 )
 
-const streamID = "supermq.mqtt"
+const streamID = "supermq.websocket"
 
 //go:generate mockery --name EventStore --output=../mocks --filename events.go --quiet --note "Copyright (c) Abstract Machines"
 type EventStore interface {
-	Connect(ctx context.Context, clientID string) error
-	Disconnect(ctx context.Context, clientID string) error
 	Publish(ctx context.Context, clientID, channelID, topic string) error
 	Subscribe(ctx context.Context, clientID, channelID, subtopic string) error
 	Unsubscribe(ctx context.Context, clientID, channelID, subtopic string) error
@@ -41,31 +39,9 @@ func NewEventStore(ctx context.Context, url, instance string) (EventStore, error
 	}, nil
 }
 
-// Connect issues event on MQTT CONNECT.
-func (es *eventStore) Connect(ctx context.Context, clientID string) error {
-	ev := mqttEvent{
-		clientID:  clientID,
-		operation: clientConnect,
-		instance:  es.instance,
-	}
-
-	return es.publisher.Publish(ctx, ev)
-}
-
-// Disconnect issues event on MQTT CONNECT.
-func (es *eventStore) Disconnect(ctx context.Context, clientID string) error {
-	ev := mqttEvent{
-		clientID:  clientID,
-		operation: clientDisconnect,
-		instance:  es.instance,
-	}
-
-	return es.publisher.Publish(ctx, ev)
-}
-
-// Publish issues event on MQTT PUBLISH.
+// Publish issues event on WS PUBLISH.
 func (es *eventStore) Publish(ctx context.Context, clientID, channelID, topic string) error {
-	ev := mqttEvent{
+	ev := wsEvent{
 		clientID:  clientID,
 		operation: clientPublish,
 		channelID: channelID,
@@ -76,9 +52,9 @@ func (es *eventStore) Publish(ctx context.Context, clientID, channelID, topic st
 	return es.publisher.Publish(ctx, ev)
 }
 
-// Subscribe issues event on MQTT SUBSCRIBE.
+// Subscribe issues event on WS SUBSCRIBE.
 func (es *eventStore) Subscribe(ctx context.Context, clientID, channelID, subtopic string) error {
-	ev := mqttEvent{
+	ev := wsEvent{
 		clientID:  clientID,
 		operation: clientSubscribe,
 		channelID: channelID,
@@ -89,9 +65,9 @@ func (es *eventStore) Subscribe(ctx context.Context, clientID, channelID, subtop
 	return es.publisher.Publish(ctx, ev)
 }
 
-// Unsubscribe issues event on MQTT UNSUBSCRIBE.
+// Unsubscribe issues event on WS UNSUBSCRIBE.
 func (es *eventStore) Unsubscribe(ctx context.Context, clientID, channelID, subtopic string) error {
-	ev := mqttEvent{
+	ev := wsEvent{
 		clientID:  clientID,
 		operation: clientUnsubscribe,
 		channelID: channelID,

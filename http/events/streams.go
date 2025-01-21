@@ -10,15 +10,14 @@ import (
 	"github.com/absmach/supermq/pkg/events/store"
 )
 
-const streamID = "supermq.mqtt"
+const streamID = "supermq.http"
+
+
 
 //go:generate mockery --name EventStore --output=../mocks --filename events.go --quiet --note "Copyright (c) Abstract Machines"
 type EventStore interface {
 	Connect(ctx context.Context, clientID string) error
-	Disconnect(ctx context.Context, clientID string) error
 	Publish(ctx context.Context, clientID, channelID, topic string) error
-	Subscribe(ctx context.Context, clientID, channelID, subtopic string) error
-	Unsubscribe(ctx context.Context, clientID, channelID, subtopic string) error
 }
 
 // EventStore is a struct used to store event streams in Redis.
@@ -41,9 +40,8 @@ func NewEventStore(ctx context.Context, url, instance string) (EventStore, error
 	}, nil
 }
 
-// Connect issues event on MQTT CONNECT.
 func (es *eventStore) Connect(ctx context.Context, clientID string) error {
-	ev := mqttEvent{
+	ev := httpEvent{
 		clientID:  clientID,
 		operation: clientConnect,
 		instance:  es.instance,
@@ -52,50 +50,12 @@ func (es *eventStore) Connect(ctx context.Context, clientID string) error {
 	return es.publisher.Publish(ctx, ev)
 }
 
-// Disconnect issues event on MQTT CONNECT.
-func (es *eventStore) Disconnect(ctx context.Context, clientID string) error {
-	ev := mqttEvent{
-		clientID:  clientID,
-		operation: clientDisconnect,
-		instance:  es.instance,
-	}
-
-	return es.publisher.Publish(ctx, ev)
-}
-
-// Publish issues event on MQTT PUBLISH.
 func (es *eventStore) Publish(ctx context.Context, clientID, channelID, topic string) error {
-	ev := mqttEvent{
+	ev := httpEvent{
 		clientID:  clientID,
 		operation: clientPublish,
 		channelID: channelID,
 		topic:     topic,
-		instance:  es.instance,
-	}
-
-	return es.publisher.Publish(ctx, ev)
-}
-
-// Subscribe issues event on MQTT SUBSCRIBE.
-func (es *eventStore) Subscribe(ctx context.Context, clientID, channelID, subtopic string) error {
-	ev := mqttEvent{
-		clientID:  clientID,
-		operation: clientSubscribe,
-		channelID: channelID,
-		topic:     subtopic,
-		instance:  es.instance,
-	}
-
-	return es.publisher.Publish(ctx, ev)
-}
-
-// Unsubscribe issues event on MQTT UNSUBSCRIBE.
-func (es *eventStore) Unsubscribe(ctx context.Context, clientID, channelID, subtopic string) error {
-	ev := mqttEvent{
-		clientID:  clientID,
-		operation: clientUnsubscribe,
-		channelID: channelID,
-		topic:     subtopic,
 		instance:  es.instance,
 	}
 
