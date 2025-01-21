@@ -33,24 +33,6 @@ func (_m *EventStore) Connect(ctx context.Context, clientID string) error {
 	return r0
 }
 
-// Disconnect provides a mock function with given fields: ctx, clientID
-func (_m *EventStore) Disconnect(ctx context.Context, clientID string) error {
-	ret := _m.Called(ctx, clientID)
-
-	if len(ret) == 0 {
-		panic("no return value specified for Disconnect")
-	}
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, string) error); ok {
-		r0 = rf(ctx, clientID)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
 // Publish provides a mock function with given fields: ctx, clientID, channelID, topic
 func (_m *EventStore) Publish(ctx context.Context, clientID string, channelID string, topic string) error {
 	ret := _m.Called(ctx, clientID, channelID, topic)
@@ -62,42 +44,6 @@ func (_m *EventStore) Publish(ctx context.Context, clientID string, channelID st
 	var r0 error
 	if rf, ok := ret.Get(0).(func(context.Context, string, string, string) error); ok {
 		r0 = rf(ctx, clientID, channelID, topic)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
-// Subscribe provides a mock function with given fields: ctx, clientID, channelID, subtopic
-func (_m *EventStore) Subscribe(ctx context.Context, clientID string, channelID string, subtopic string) error {
-	ret := _m.Called(ctx, clientID, channelID, subtopic)
-
-	if len(ret) == 0 {
-		panic("no return value specified for Subscribe")
-	}
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, string, string) error); ok {
-		r0 = rf(ctx, clientID, channelID, subtopic)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
-// Unsubscribe provides a mock function with given fields: ctx, clientID, channelID, subtopic
-func (_m *EventStore) Unsubscribe(ctx context.Context, clientID string, channelID string, subtopic string) error {
-	ret := _m.Called(ctx, clientID, channelID, subtopic)
-
-	if len(ret) == 0 {
-		panic("no return value specified for Unsubscribe")
-	}
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, string, string) error); ok {
-		r0 = rf(ctx, clientID, channelID, subtopic)
 	} else {
 		r0 = ret.Error(0)
 	}

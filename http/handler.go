@@ -18,6 +18,7 @@ import (
 	grpcChannelsV1 "github.com/absmach/supermq/api/grpc/channels/v1"
 	grpcClientsV1 "github.com/absmach/supermq/api/grpc/clients/v1"
 	apiutil "github.com/absmach/supermq/api/http/util"
+	"github.com/absmach/supermq/http/events"
 	smqauthn "github.com/absmach/supermq/pkg/authn"
 	"github.com/absmach/supermq/pkg/connections"
 	"github.com/absmach/supermq/pkg/errors"
@@ -49,6 +50,7 @@ var (
 	errClientNotInitialized     = errors.New("client is not initialized")
 	errFailedPublish            = errors.New("failed to publish")
 	errFailedPublishToMsgBroker = errors.New("failed to publish to supermq message broker")
+	errFailedPublishEvent       = errors.New("failed to publish event")
 	errMalformedSubtopic        = mgate.NewHTTPProxyError(http.StatusBadRequest, errors.New("malformed subtopic"))
 	errMalformedTopic           = mgate.NewHTTPProxyError(http.StatusBadRequest, errors.New("malformed topic"))
 	errMissingTopicPub          = mgate.NewHTTPProxyError(http.StatusBadRequest, errors.New("failed to publish due to missing topic"))
@@ -64,16 +66,18 @@ type handler struct {
 	channels  grpcChannelsV1.ChannelsServiceClient
 	authn     smqauthn.Authentication
 	logger    *slog.Logger
+	es        events.EventStore
 }
 
 // NewHandler creates new Handler entity.
-func NewHandler(publisher messaging.Publisher, authn smqauthn.Authentication, clients grpcClientsV1.ClientsServiceClient, channels grpcChannelsV1.ChannelsServiceClient, logger *slog.Logger) session.Handler {
+func NewHandler(publisher messaging.Publisher, es events.EventStore, authn smqauthn.Authentication, clients grpcClientsV1.ClientsServiceClient, channels grpcChannelsV1.ChannelsServiceClient, logger *slog.Logger) session.Handler {
 	return &handler{
 		publisher: publisher,
 		authn:     authn,
 		clients:   clients,
 		channels:  channels,
 		logger:    logger,
+		es:        es,
 	}
 }
 
@@ -93,6 +97,10 @@ func (h *handler) AuthConnect(ctx context.Context) error {
 		tok = strings.TrimPrefix(string(s.Password), apiutil.ClientPrefix)
 	default:
 		tok = string(s.Password)
+	}
+
+	if err := h.es.Connect(ctx, tok); err != nil {
+		h.logger.Error(errors.Wrap(errFailedPublishEvent, err).Error())
 	}
 
 	h.logger.Info(fmt.Sprintf(logInfoConnected, tok))
@@ -186,6 +194,10 @@ func (h *handler) Publish(ctx context.Context, topic *string, payload *[]byte) e
 
 	if err := h.publisher.Publish(ctx, msg.Channel, &msg); err != nil {
 		return errors.Wrap(errFailedPublishToMsgBroker, err)
+	}
+
+	if err := h.es.Publish(ctx, clientID, msg.Channel, msg.Subtopic); err != nil {
+		return errors.Wrap(errFailedPublishEvent, err)
 	}
 
 	h.logger.Info(fmt.Sprintf(logInfoPublished, clientType, clientID, *topic))

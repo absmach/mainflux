@@ -21,6 +21,8 @@ import (
 	climocks "github.com/absmach/supermq/clients/mocks"
 	server "github.com/absmach/supermq/http"
 	"github.com/absmach/supermq/http/api"
+	"github.com/absmach/supermq/http/events"
+	"github.com/absmach/supermq/http/mocks"
 	"github.com/absmach/supermq/internal/testsutil"
 	smqlog "github.com/absmach/supermq/logger"
 	smqauthn "github.com/absmach/supermq/pkg/authn"
@@ -39,9 +41,9 @@ const (
 
 var clientID = testsutil.GenerateUUID(&testing.T{})
 
-func newService(authn smqauthn.Authentication, clients grpcClientsV1.ClientsServiceClient, channels grpcChannelsV1.ChannelsServiceClient) (session.Handler, *pubsub.PubSub) {
+func newService(authn smqauthn.Authentication, es events.EventStore, clients grpcClientsV1.ClientsServiceClient, channels grpcChannelsV1.ChannelsServiceClient) (session.Handler, *pubsub.PubSub) {
 	pub := new(pubsub.PubSub)
-	return server.NewHandler(pub, authn, clients, channels, smqlog.NewMock()), pub
+	return server.NewHandler(pub, es, authn, clients, channels, smqlog.NewMock()), pub
 }
 
 func newTargetHTTPServer() *httptest.Server {
@@ -93,6 +95,7 @@ func TestPublish(t *testing.T) {
 	clients := new(climocks.ClientsServiceClient)
 	authn := new(authnMocks.Authentication)
 	channels := new(chmocks.ChannelsServiceClient)
+	es := new(mocks.EventStore)
 	chanID := "1"
 	ctSenmlJSON := "application/senml+json"
 	ctSenmlCBOR := "application/senml+cbor"
@@ -102,7 +105,7 @@ func TestPublish(t *testing.T) {
 	msg := `[{"n":"current","t":-1,"v":1.6}]`
 	msgJSON := `{"field1":"val1","field2":"val2"}`
 	msgCBOR := `81A3616E6763757272656E746174206176FB3FF999999999999A`
-	svc, pub := newService(authn, clients, channels)
+	svc, pub := newService(authn, es, clients, channels)
 	target := newTargetHTTPServer()
 	defer target.Close()
 	ts, err := newProxyHTPPServer(svc, target)
@@ -223,6 +226,8 @@ func TestPublish(t *testing.T) {
 				ClientType: policies.ClientType,
 				Type:       uint32(connections.Publish),
 			}).Return(tc.authzRes, tc.authzErr)
+			eventsCall := es.On("Connect", mock.Anything, mock.Anything).Return(nil)
+			eventsCall1 := es.On("Publish", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 			svcCall := pub.On("Publish", mock.Anything, tc.chanID, mock.Anything).Return(nil)
 			req := testRequest{
 				client:      ts.Client(),
@@ -239,6 +244,8 @@ func TestPublish(t *testing.T) {
 			svcCall.Unset()
 			clientsCall.Unset()
 			channelsCall.Unset()
+			eventsCall.Unset()
+			eventsCall1.Unset()
 		})
 	}
 }

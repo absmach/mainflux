@@ -22,6 +22,7 @@ import (
 	svcerr "github.com/absmach/supermq/pkg/errors/service"
 	"github.com/absmach/supermq/pkg/messaging"
 	"github.com/absmach/supermq/pkg/policies"
+	"github.com/absmach/supermq/ws/events"
 )
 
 var _ session.Handler = (*handler)(nil)
@@ -48,6 +49,9 @@ var (
 	errFailedPublish            = errors.New("failed to publish")
 	errFailedParseSubtopic      = errors.New("failed to parse subtopic")
 	errFailedPublishToMsgBroker = errors.New("failed to publish to supermq message broker")
+	errFailedPublishEvent       = errors.New("failed to publish publish event")
+	errFailedSubscribeEvent     = errors.New("failed to publish subscribe event")
+	errFailedUnsubscribeEvent   = errors.New("failed to publish unsubscribe event")
 )
 
 var channelRegExp = regexp.MustCompile(`^\/?channels\/([\w\-]+)\/messages(\/[^?]*)?(\?.*)?$`)
@@ -59,16 +63,18 @@ type handler struct {
 	channels grpcChannelsV1.ChannelsServiceClient
 	authn    smqauthn.Authentication
 	logger   *slog.Logger
+	es       events.EventStore
 }
 
 // NewHandler creates new Handler entity.
-func NewHandler(pubsub messaging.PubSub, logger *slog.Logger, authn smqauthn.Authentication, clients grpcClientsV1.ClientsServiceClient, channels grpcChannelsV1.ChannelsServiceClient) session.Handler {
+func NewHandler(pubsub messaging.PubSub, es events.EventStore, logger *slog.Logger, authn smqauthn.Authentication, clients grpcClientsV1.ClientsServiceClient, channels grpcChannelsV1.ChannelsServiceClient) session.Handler {
 	return &handler{
 		logger:   logger,
 		pubsub:   pubsub,
 		authn:    authn,
 		clients:  clients,
 		channels: channels,
+		es:       es,
 	}
 }
 
@@ -97,7 +103,19 @@ func (h *handler) AuthPublish(ctx context.Context, topic *string, payload *[]byt
 		token = string(s.Password)
 	}
 
-	return h.authAccess(ctx, token, *topic, connections.Publish)
+	clientID, err := h.authAccess(ctx, token, *topic, connections.Publish)
+	if err != nil {
+		return err
+	}
+	channelID, subTopic, err := parseTopic(*topic)
+	if err != nil {
+		return err
+	}
+	if err := h.es.Publish(ctx, clientID, channelID, subTopic); err != nil {
+		return errors.Wrap(errFailedPublishEvent, err)
+	}
+
+	return nil
 }
 
 // AuthSubscribe is called on device publish,
@@ -120,8 +138,16 @@ func (h *handler) AuthSubscribe(ctx context.Context, topics *[]string) error {
 	}
 
 	for _, topic := range *topics {
-		if err := h.authAccess(ctx, token, topic, connections.Subscribe); err != nil {
+		clientID, err := h.authAccess(ctx, token, topic, connections.Subscribe)
+		if err != nil {
 			return err
+		}
+		channelID, subTopic, err := parseTopic(topic)
+		if err != nil {
+			return err
+		}
+		if err := h.es.Subscribe(ctx, clientID, channelID, subTopic); err != nil {
+			return errors.Wrap(errFailedSubscribeEvent, err)
 		}
 	}
 
@@ -147,17 +173,9 @@ func (h *handler) Publish(ctx context.Context, topic *string, payload *[]byte) e
 
 	// Topics are in the format:
 	// channels/<channel_id>/messages/<subtopic>/.../ct/<content_type>
-	channelParts := channelRegExp.FindStringSubmatch(*topic)
-	if len(channelParts) < 2 {
-		return errors.Wrap(errFailedPublish, errMalformedTopic)
-	}
-
-	chanID := channelParts[1]
-	subtopic := channelParts[2]
-
-	subtopic, err := parseSubtopic(subtopic)
+	chanID, subtopic, err := parseTopic(*topic)
 	if err != nil {
-		return errors.Wrap(errFailedParseSubtopic, err)
+		return err
 	}
 
 	var clientID, clientType string
@@ -213,6 +231,10 @@ func (h *handler) Publish(ctx context.Context, topic *string, payload *[]byte) e
 		return errors.Wrap(errFailedPublishToMsgBroker, err)
 	}
 
+	if err := h.es.Publish(ctx, msg.Publisher, msg.Channel, msg.Subtopic); err != nil {
+		return errors.Wrap(errFailedPublishEvent, err)
+	}
+
 	return nil
 }
 
@@ -233,6 +255,31 @@ func (h *handler) Unsubscribe(ctx context.Context, topics *[]string) error {
 		return errors.Wrap(errFailedUnsubscribe, errClientNotInitialized)
 	}
 
+	if topics == nil || *topics == nil {
+		return errMissingTopicSub
+	}
+
+	var token string
+	switch {
+	case strings.HasPrefix(string(s.Password), "Client"):
+		token = strings.ReplaceAll(string(s.Password), "Client ", "")
+	default:
+		token = string(s.Password)
+	}
+	for _, topic := range *topics {
+		clientID, err := h.authAccess(ctx, token, topic, connections.Subscribe)
+		if err != nil {
+			return err
+		}
+		channelID, subTopic, err := parseTopic(topic)
+		if err != nil {
+			return err
+		}
+		if err := h.es.Subscribe(ctx, clientID, channelID, subTopic); err != nil {
+			return errors.Wrap(errFailedSubscribeEvent, err)
+		}
+	}
+
 	h.logger.Info(fmt.Sprintf(LogInfoUnsubscribed, s.ID, strings.Join(*topics, ",")))
 	return nil
 }
@@ -242,24 +289,24 @@ func (h *handler) Disconnect(ctx context.Context) error {
 	return nil
 }
 
-func (h *handler) authAccess(ctx context.Context, token, topic string, msgType connections.ConnType) error {
+func (h *handler) authAccess(ctx context.Context, token, topic string, msgType connections.ConnType) (string, error) {
 	var clientID, clientType string
 	switch {
 	case strings.HasPrefix(token, "Client"):
 		clientKey := extractClientSecret(token)
 		authnRes, err := h.clients.Authenticate(ctx, &grpcClientsV1.AuthnReq{ClientSecret: clientKey})
 		if err != nil {
-			return errors.Wrap(svcerr.ErrAuthentication, err)
+			return "", errors.Wrap(svcerr.ErrAuthentication, err)
 		}
 		if !authnRes.Authenticated {
-			return svcerr.ErrAuthentication
+			return "", svcerr.ErrAuthentication
 		}
 		clientType = policies.ClientType
 		clientID = authnRes.GetId()
 	default:
 		authnSession, err := h.authn.Authenticate(ctx, extractBearerToken(token))
 		if err != nil {
-			return err
+			return "", err
 		}
 		clientType = policies.UserType
 		clientID = authnSession.DomainUserID
@@ -268,12 +315,12 @@ func (h *handler) authAccess(ctx context.Context, token, topic string, msgType c
 	// Topics are in the format:
 	// channels/<channel_id>/messages/<subtopic>/.../ct/<content_type>
 	if !channelRegExp.MatchString(topic) {
-		return errMalformedTopic
+		return "", errMalformedTopic
 	}
 
 	channelParts := channelRegExp.FindStringSubmatch(topic)
 	if len(channelParts) < 1 {
-		return errMalformedTopic
+		return "", errMalformedTopic
 	}
 
 	chanID := channelParts[1]
@@ -286,13 +333,30 @@ func (h *handler) authAccess(ctx context.Context, token, topic string, msgType c
 	}
 	res, err := h.channels.Authorize(ctx, ar)
 	if err != nil {
-		return errors.Wrap(svcerr.ErrAuthorization, err)
+		return "", errors.Wrap(svcerr.ErrAuthorization, err)
 	}
 	if !res.GetAuthorized() {
-		return errors.Wrap(svcerr.ErrAuthorization, err)
+		return "", errors.Wrap(svcerr.ErrAuthorization, err)
 	}
 
-	return nil
+	return clientID, nil
+}
+
+func parseTopic(topic string) (string, string, error) {
+	channelParts := channelRegExp.FindStringSubmatch(topic)
+	if len(channelParts) < 2 {
+		return "", "", errors.Wrap(errFailedPublish, errMalformedTopic)
+	}
+
+	chanID := channelParts[1]
+	subtopic := channelParts[2]
+
+	subtopic, err := parseSubtopic(subtopic)
+	if err != nil {
+		return "", "", errors.Wrap(errFailedParseSubtopic, err)
+	}
+
+	return chanID, subtopic, nil
 }
 
 func parseSubtopic(subtopic string) (string, error) {

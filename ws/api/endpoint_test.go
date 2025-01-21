@@ -21,9 +21,10 @@ import (
 	smqlog "github.com/absmach/supermq/logger"
 	smqauthn "github.com/absmach/supermq/pkg/authn"
 	authnMocks "github.com/absmach/supermq/pkg/authn/mocks"
-	"github.com/absmach/supermq/pkg/messaging/mocks"
+	msgmocks "github.com/absmach/supermq/pkg/messaging/mocks"
 	"github.com/absmach/supermq/ws"
 	"github.com/absmach/supermq/ws/api"
+	"github.com/absmach/supermq/ws/mocks"
 	"github.com/gorilla/websocket"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -40,8 +41,8 @@ const (
 
 var msg = []byte(`[{"n":"current","t":-1,"v":1.6}]`)
 
-func newService(clients grpcClientsV1.ClientsServiceClient, channels grpcChannelsV1.ChannelsServiceClient) (ws.Service, *mocks.PubSub) {
-	pubsub := new(mocks.PubSub)
+func newService(clients grpcClientsV1.ClientsServiceClient, channels grpcChannelsV1.ChannelsServiceClient) (ws.Service, *msgmocks.PubSub) {
+	pubsub := new(msgmocks.PubSub)
 	return ws.New(clients, channels, pubsub), pubsub
 }
 
@@ -97,10 +98,11 @@ func TestHandshake(t *testing.T) {
 	clients := new(climocks.ClientsServiceClient)
 	channels := new(chmocks.ChannelsServiceClient)
 	authn := new(authnMocks.Authentication)
+	es := new(mocks.EventStore)
 	svc, pubsub := newService(clients, channels)
 	target := newHTTPServer(svc)
 	defer target.Close()
-	handler := ws.NewHandler(pubsub, smqlog.NewMock(), authn, clients, channels)
+	handler := ws.NewHandler(pubsub, es, smqlog.NewMock(), authn, clients, channels)
 	ts, err := newProxyHTPPServer(handler, target)
 	require.Nil(t, err)
 	defer ts.Close()
