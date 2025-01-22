@@ -107,6 +107,8 @@ func TestHandshake(t *testing.T) {
 	require.Nil(t, err)
 	defer ts.Close()
 	pubsub.On("Subscribe", mock.Anything, mock.Anything).Return(nil)
+	es.On("Subscribe", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
+	es.On("Publish", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 	pubsub.On("Publish", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 	clients.On("Authenticate", mock.Anything, mock.Anything).Return(&grpcClientsV1.AuthnRes{Authenticated: true}, nil)
 	authn.On("Authenticate", mock.Anything, mock.Anything).Return(smqauthn.Session{}, nil)
