@@ -6,7 +6,7 @@ package events
 import "github.com/absmach/supermq/pkg/events"
 
 const (
-	mqttPrefix        = "http"
+	mqttPrefix        = "mqtt"
 	clientPublish     = mqttPrefix + ".client_publish"
 	clientSubscribe   = mqttPrefix + ".client_subscribe"
 	clientUnsubscribe = mqttPrefix + ".client_unsubscribe"
@@ -20,6 +20,7 @@ type mqttEvent struct {
 	operation string
 	channelID string
 	clientID  string
+	connID    string
 	topic     string
 	instance  string
 }
@@ -29,6 +30,7 @@ func (me mqttEvent) Encode() (map[string]interface{}, error) {
 		"operation":  me.operation,
 		"channel_id": me.channelID,
 		"client_id":  me.clientID,
+		"conn_id":    me.connID,
 		"topic":      me.topic,
 	}, nil
 }
