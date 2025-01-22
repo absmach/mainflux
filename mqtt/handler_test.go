@@ -147,7 +147,7 @@ func TestAuthConnect(t *testing.T) {
 				password = string(tc.session.Password)
 			}
 			clientsCall := clients.On("Authenticate", mock.Anything, &grpcClientsV1.AuthnReq{ClientSecret: password}).Return(tc.authNRes, tc.authNErr)
-			svcCall := eventStore.On("Connect", mock.Anything, password).Return(tc.err)
+			svcCall := eventStore.On("Connect", mock.Anything, mock.Anything, clientID).Return(tc.err)
 			err := handler.AuthConnect(ctx)
 			assert.True(t, errors.Contains(err, tc.err), fmt.Sprintf("%s: expected %s got %s\n", tc.desc, tc.err, err))
 			svcCall.Unset()
@@ -449,7 +449,7 @@ func TestSubscribe(t *testing.T) {
 		if tc.session != nil {
 			ctx = session.NewContext(ctx, tc.session)
 		}
-		eventsCall := eventStore.On("Subscribe", mock.Anything, clientID, mock.Anything, mock.Anything).Return(nil)
+		eventsCall := eventStore.On("Subscribe", mock.Anything, clientID, mock.Anything, clientID, mock.Anything).Return(nil)
 		err := handler.Subscribe(ctx, &tc.topic)
 		assert.Contains(t, logBuffer.String(), tc.logMsg)
 		assert.Equal(t, tc.err, err)
@@ -476,7 +476,7 @@ func TestUnsubscribe(t *testing.T) {
 			session:   nil,
 			topic:     topics,
 			channelID: chanID,
-			authZRes: &grpcChannelsV1.AuthzRes{Authorized: true},
+			authZRes:  &grpcChannelsV1.AuthzRes{Authorized: true},
 			err:       errors.Wrap(mqtt.ErrFailedUnsubscribe, mqtt.ErrClientNotInitialized),
 		},
 		{
@@ -484,7 +484,7 @@ func TestUnsubscribe(t *testing.T) {
 			session:   &sessionClient,
 			topic:     topics,
 			channelID: chanID,
-			authZRes: &grpcChannelsV1.AuthzRes{Authorized: true},
+			authZRes:  &grpcChannelsV1.AuthzRes{Authorized: true},
 			logMsg:    fmt.Sprintf(mqtt.LogInfoUnsubscribed, clientID, topics[0]),
 		},
 	}
@@ -494,7 +494,7 @@ func TestUnsubscribe(t *testing.T) {
 		if tc.session != nil {
 			ctx = session.NewContext(ctx, tc.session)
 		}
-		eventsCall := eventStore.On("Unsubscribe", mock.Anything, clientID, mock.Anything, mock.Anything).Return(nil)
+		eventsCall := eventStore.On("Unsubscribe", mock.Anything, clientID, mock.Anything, clientID, mock.Anything).Return(nil)
 		channelsCall := channels.On("Authorize", mock.Anything, &grpcChannelsV1.AuthzReq{
 			ChannelId:  tc.channelID,
 			ClientId:   clientID,
@@ -536,12 +536,10 @@ func TestDisconnect(t *testing.T) {
 
 	for _, tc := range cases {
 		ctx := context.TODO()
-		password := ""
 		if tc.session != nil {
 			ctx = session.NewContext(ctx, tc.session)
-			password = string(tc.session.Password)
 		}
-		svcCall := eventStore.On("Disconnect", mock.Anything, password).Return(tc.err)
+		svcCall := eventStore.On("Disconnect", mock.Anything, sessionClient.Username, sessionClient.ID).Return(tc.err)
 		err := handler.Disconnect(ctx)
 		assert.Contains(t, logBuffer.String(), tc.logMsg)
 		assert.Equal(t, tc.err, err)

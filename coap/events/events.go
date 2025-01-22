@@ -10,50 +10,21 @@ const (
 	clientUnsubscribe = coapPrefix + ".client_unsubscribe"
 )
 
-type clientPublishEvent struct {
-	ChannelID string
-	ClientID  string
-	Topic     string
+type coapEvent struct {
+	operation string
+	channelID string
+	clientID  string
+	connID    string
+	topic     string
 }
 
-func (cpe clientPublishEvent) Encode() (map[string]interface{}, error) {
+func (ce coapEvent) Encode() (map[string]interface{}, error) {
 	val := map[string]interface{}{
-		"operation":  clientPublish,
-		"channel_id": cpe.ChannelID,
-		"client_id":  cpe.ClientID,
-		"topic":      cpe.Topic,
-	}
-	return val, nil
-}
-
-type clientSubscribeEvent struct {
-	ChannelID string
-	ClientID  string
-	Topic     string
-}
-
-func (cse clientSubscribeEvent) Encode() (map[string]interface{}, error) {
-	val := map[string]interface{}{
-		"operation":  clientSubscribe,
-		"channel_id": cse.ChannelID,
-		"client_id":  cse.ClientID,
-		"topic":      cse.Topic,
-	}
-	return val, nil
-}
-
-type clientUnsubscribeEvent struct {
-	ChannelID string
-	ClientID  string
-	Topic     string
-}
-
-func (cse clientUnsubscribeEvent) Encode() (map[string]interface{}, error) {
-	val := map[string]interface{}{
-		"operation":  clientUnsubscribe,
-		"channel_id": cse.ChannelID,
-		"client_id":  cse.ClientID,
-		"topic":      cse.Topic,
+		"operation":  ce.operation,
+		"channel_id": ce.channelID,
+		"client_id":  ce.clientID,
+		"conn_id":    ce.connID,
+		"topic":      ce.topic,
 	}
 	return val, nil
 }

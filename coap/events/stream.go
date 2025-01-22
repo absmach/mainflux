@@ -39,10 +39,11 @@ func (es *eventStore) Publish(ctx context.Context, clientID string, msg *messagi
 		return err
 	}
 
-	event := clientPublishEvent{
-		ClientID:  clientID,
-		ChannelID: msg.GetChannel(),
-		Topic:     msg.GetSubtopic(),
+	event := coapEvent{
+		operation: clientPublish,
+		clientID:  clientID,
+		channelID: msg.GetChannel(),
+		topic:     msg.GetSubtopic(),
 	}
 	if err := es.events.Publish(ctx, event); err != nil {
 		return err
@@ -57,10 +58,12 @@ func (es *eventStore) Subscribe(ctx context.Context, clientID, channelID, subtop
 		return err
 	}
 
-	event := clientSubscribeEvent{
-		ClientID:  clientID,
-		ChannelID: channelID,
-		Topic:     subtopic,
+	event := coapEvent{
+		operation: clientSubscribe,
+		clientID:  clientID,
+		channelID: channelID,
+		connID:    c.Token(),
+		topic:     subtopic,
 	}
 	if err := es.events.Publish(ctx, event); err != nil {
 		return err
@@ -75,10 +78,12 @@ func (es *eventStore) Unsubscribe(ctx context.Context, clientID, channelID, subt
 		return err
 	}
 
-	event := clientUnsubscribeEvent{
-		ClientID:  clientID,
-		ChannelID: channelID,
-		Topic:     subtopic,
+	event := coapEvent{
+		operation: clientUnsubscribe,
+		clientID:  clientID,
+		channelID: channelID,
+		connID:    token,
+		topic:     subtopic,
 	}
 	if err := es.events.Publish(ctx, event); err != nil {
 		return err

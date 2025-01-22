@@ -49,7 +49,7 @@ var (
 	errFailedPublish            = errors.New("failed to publish")
 	errFailedParseSubtopic      = errors.New("failed to parse subtopic")
 	errFailedPublishToMsgBroker = errors.New("failed to publish to supermq message broker")
-	errFailedPublishEvent       = errors.New("failed to publish publish event")
+	errFailedPublishEvent       = errors.New("failed to publish event")
 	errFailedSubscribeEvent     = errors.New("failed to publish subscribe event")
 	errFailedUnsubscribeEvent   = errors.New("failed to publish unsubscribe event")
 )
@@ -147,7 +147,7 @@ func (h *handler) AuthSubscribe(ctx context.Context, topics *[]string) error {
 			return err
 		}
 		if err := h.es.Subscribe(ctx, clientID, channelID, subTopic); err != nil {
-			return errors.Wrap(errFailedSubscribeEvent, err)
+			return errors.Wrap(errFailedUnsubscribeEvent, err)
 		}
 	}
 

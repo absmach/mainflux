@@ -15,17 +15,17 @@ type EventStore struct {
 	mock.Mock
 }
 
-// Connect provides a mock function with given fields: ctx, clientID
-func (_m *EventStore) Connect(ctx context.Context, clientID string) error {
-	ret := _m.Called(ctx, clientID)
+// Connect provides a mock function with given fields: ctx, clientID, connID
+func (_m *EventStore) Connect(ctx context.Context, clientID string, connID string) error {
+	ret := _m.Called(ctx, clientID, connID)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Connect")
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, string) error); ok {
-		r0 = rf(ctx, clientID)
+	if rf, ok := ret.Get(0).(func(context.Context, string, string) error); ok {
+		r0 = rf(ctx, clientID, connID)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -33,17 +33,17 @@ func (_m *EventStore) Connect(ctx context.Context, clientID string) error {
 	return r0
 }
 
-// Disconnect provides a mock function with given fields: ctx, clientID
-func (_m *EventStore) Disconnect(ctx context.Context, clientID string) error {
-	ret := _m.Called(ctx, clientID)
+// Disconnect provides a mock function with given fields: ctx, clientID, connID
+func (_m *EventStore) Disconnect(ctx context.Context, clientID string, connID string) error {
+	ret := _m.Called(ctx, clientID, connID)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Disconnect")
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, string) error); ok {
-		r0 = rf(ctx, clientID)
+	if rf, ok := ret.Get(0).(func(context.Context, string, string) error); ok {
+		r0 = rf(ctx, clientID, connID)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -69,17 +69,17 @@ func (_m *EventStore) Publish(ctx context.Context, clientID string, channelID st
 	return r0
 }
 
-// Subscribe provides a mock function with given fields: ctx, clientID, channelID, subtopic
-func (_m *EventStore) Subscribe(ctx context.Context, clientID string, channelID string, subtopic string) error {
-	ret := _m.Called(ctx, clientID, channelID, subtopic)
+// Subscribe provides a mock function with given fields: ctx, clientID, channelID, connID, subtopic
+func (_m *EventStore) Subscribe(ctx context.Context, clientID string, channelID string, connID string, subtopic string) error {
+	ret := _m.Called(ctx, clientID, channelID, connID, subtopic)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Subscribe")
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, string, string) error); ok {
-		r0 = rf(ctx, clientID, channelID, subtopic)
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, string) error); ok {
+		r0 = rf(ctx, clientID, channelID, connID, subtopic)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -87,17 +87,17 @@ func (_m *EventStore) Subscribe(ctx context.Context, clientID string, channelID 
 	return r0
 }
 
-// Unsubscribe provides a mock function with given fields: ctx, clientID, channelID, subtopic
-func (_m *EventStore) Unsubscribe(ctx context.Context, clientID string, channelID string, subtopic string) error {
-	ret := _m.Called(ctx, clientID, channelID, subtopic)
+// Unsubscribe provides a mock function with given fields: ctx, clientID, channelID, connID, subtopic
+func (_m *EventStore) Unsubscribe(ctx context.Context, clientID string, channelID string, connID string, subtopic string) error {
+	ret := _m.Called(ctx, clientID, channelID, connID, subtopic)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Unsubscribe")
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, string, string) error); ok {
-		r0 = rf(ctx, clientID, channelID, subtopic)
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, string) error); ok {
+		r0 = rf(ctx, clientID, channelID, connID, subtopic)
 	} else {
 		r0 = ret.Error(0)
 	}

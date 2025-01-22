@@ -110,7 +110,7 @@ func (h *handler) AuthConnect(ctx context.Context) error {
 		return errInvalidUserId
 	}
 
-	if err := h.es.Connect(ctx, pwd); err != nil {
+	if err := h.es.Connect(ctx, s.Username, s.ID); err != nil {
 		h.logger.Error(errors.Wrap(ErrFailedPublishConnectEvent, err).Error())
 	}
 
@@ -129,7 +129,6 @@ func (h *handler) AuthPublish(ctx context.Context, topic *string, payload *[]byt
 	}
 
 	return h.authAccess(ctx, string(s.Username), *topic, connections.Publish)
-
 }
 
 // AuthSubscribe is called on device subscribe,
@@ -144,16 +143,8 @@ func (h *handler) AuthSubscribe(ctx context.Context, topics *[]string) error {
 	}
 
 	for _, topic := range *topics {
-		err := h.authAccess(ctx, s.Username, topic, connections.Subscribe)
-		if err != nil {
+		if err := h.authAccess(ctx, string(s.Username), topic, connections.Subscribe); err != nil {
 			return err
-		}
-		channelID, subTopic, err := parseTopic(topic)
-		if err != nil {
-			return err
-		}
-		if err := h.es.Subscribe(ctx, s.Username, channelID, subTopic); err != nil {
-			return errors.Wrap(ErrFailedSubscribeEvent, err)
 		}
 	}
 
@@ -211,6 +202,16 @@ func (h *handler) Subscribe(ctx context.Context, topics *[]string) error {
 		return errors.Wrap(ErrFailedSubscribe, ErrClientNotInitialized)
 	}
 
+	for _, topic := range *topics {
+		channelID, subTopic, err := parseTopic(topic)
+		if err != nil {
+			return err
+		}
+		if err := h.es.Subscribe(ctx, s.Username, channelID, s.ID, subTopic); err != nil {
+			return errors.Wrap(ErrFailedUnsubscribeEvent, err)
+		}
+	}
+
 	h.logger.Info(fmt.Sprintf(LogInfoSubscribed, s.ID, strings.Join(*topics, ",")))
 
 	return nil
@@ -228,15 +229,11 @@ func (h *handler) Unsubscribe(ctx context.Context, topics *[]string) error {
 	}
 
 	for _, topic := range *topics {
-		err := h.authAccess(ctx, s.Username, topic, connections.Subscribe)
-		if err != nil {
-			return err
-		}
 		channelID, subTopic, err := parseTopic(topic)
 		if err != nil {
 			return err
 		}
-		if err := h.es.Unsubscribe(ctx, s.Username, channelID, subTopic); err != nil {
+		if err := h.es.Unsubscribe(ctx, s.Username, channelID, s.ID, subTopic); err != nil {
 			return errors.Wrap(ErrFailedUnsubscribeEvent, err)
 		}
 	}
@@ -252,7 +249,7 @@ func (h *handler) Disconnect(ctx context.Context) error {
 		return errors.Wrap(ErrFailedDisconnect, ErrClientNotInitialized)
 	}
 	h.logger.Error(fmt.Sprintf(LogInfoDisconnected, s.ID, s.Password))
-	if err := h.es.Disconnect(ctx, string(s.Password)); err != nil {
+	if err := h.es.Disconnect(ctx, s.Username, s.ID); err != nil {
 		return errors.Wrap(ErrFailedPublishDisconnectEvent, err)
 	}
 	return nil
