@@ -61,7 +61,11 @@ func newService() clients.Service {
 	repo = new(climocks.Repository)
 	chgRPCClient = new(chmocks.ChannelsServiceClient)
 	gpgRPCClient = new(gpmocks.GroupsServiceClient)
-	tsv, _ := clients.NewService(repo, pService, cache, chgRPCClient, gpgRPCClient, idProvider, sidProvider)
+	availableActions := []roles.Action{}
+	builtInRoles := map[roles.BuiltInRoleName][]roles.Action{
+		clients.BuiltInRoleAdmin: availableActions,
+	}
+	tsv, _ := clients.NewService(repo, pService, cache, chgRPCClient, gpgRPCClient, idProvider, sidProvider, availableActions, builtInRoles)
 	return tsv
 }
 

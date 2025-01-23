@@ -6,6 +6,7 @@ package private
 import (
 	"context"
 
+	"github.com/absmach/supermq/auth"
 	"github.com/absmach/supermq/channels"
 	"github.com/absmach/supermq/pkg/errors"
 	svcerr "github.com/absmach/supermq/pkg/errors/service"
@@ -35,10 +36,15 @@ func New(repo channels.Repository, evaluator policies.Evaluator, policy policies
 func (svc service) Authorize(ctx context.Context, req channels.AuthzReq) error {
 	switch req.ClientType {
 	case policies.UserType:
+		permission, err := req.Type.Permission()
+		if err != nil {
+			return err
+		}
 		pr := policies.Policy{
-			Subject:     req.ClientID,
+			Subject:     auth.EncodeDomainUserID(req.DomainID, req.ClientID),
 			SubjectType: policies.UserType,
 			Object:      req.ChannelID,
+			Permission:  permission,
 			ObjectType:  policies.ChannelType,
 		}
 		if err := svc.evaluator.CheckPolicy(ctx, pr); err != nil {

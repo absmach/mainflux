@@ -62,6 +62,17 @@ func (c ConnType) String() string {
 	}
 }
 
+func (c ConnType) Permission() (string, error) {
+	switch c {
+	case Publish:
+		return "publish_permission", nil
+	case Subscribe:
+		return "subscribe_permission", nil
+	default:
+		return "", fmt.Errorf("Unknown connection type %d", c)
+	}
+}
+
 func NewType(c uint) (ConnType, error) {
 	if err := CheckConnType(ConnType(c)); err != nil {
 		return Invalid, err

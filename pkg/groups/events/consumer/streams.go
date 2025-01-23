@@ -5,7 +5,6 @@ package consumer
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
 
 	"github.com/absmach/supermq/groups"
@@ -210,7 +209,7 @@ func (es *eventHandler) removeParentGroupHandler(ctx context.Context, data map[s
 	if err != nil {
 		return errors.Wrap(errRemoveParentGroupEvent, err)
 	}
-	fmt.Println(g, g.Parent, g.ID)
+
 	if err := es.repo.UnassignParentGroup(ctx, g.Parent, id); err != nil {
 		return errors.Wrap(errRemoveParentGroupEvent, err)
 	}

@@ -36,8 +36,8 @@ type service struct {
 }
 
 // NewService returns a new Clients service implementation.
-func NewService(repo Repository, policy policies.Service, cache Cache, channels grpcChannelsV1.ChannelsServiceClient, groups grpcGroupsV1.GroupsServiceClient, idProvider smq.IDProvider, sIDProvider smq.IDProvider) (Service, error) {
-	rpms, err := roles.NewProvisionManageService(policies.ClientType, repo, policy, sIDProvider, AvailableActions(), BuiltInRoles())
+func NewService(repo Repository, policy policies.Service, cache Cache, channels grpcChannelsV1.ChannelsServiceClient, groups grpcGroupsV1.GroupsServiceClient, idProvider smq.IDProvider, sIDProvider smq.IDProvider, availableActions []roles.Action, builtInRoles map[roles.BuiltInRoleName][]roles.Action) (Service, error) {
+	rpms, err := roles.NewProvisionManageService(policies.ClientType, repo, policy, sIDProvider, availableActions, builtInRoles)
 	if err != nil {
 		return service{}, err
 	}
@@ -95,7 +95,7 @@ func (svc service) CreateClients(ctx context.Context, session authn.Session, cls
 	}()
 
 	newBuiltInRoleMembers := map[roles.BuiltInRoleName][]roles.Member{
-		ClientBuiltInRoleAdmin: {roles.Member(session.UserID)},
+		BuiltInRoleAdmin: {roles.Member(session.UserID)},
 	}
 
 	optionalPolicies := []policies.Policy{}

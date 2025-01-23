@@ -65,7 +65,11 @@ func newService(t *testing.T) channels.Service {
 	policies = new(policymocks.Service)
 	clientsSvc = new(clmocks.ClientsServiceClient)
 	groupsSvc = new(gpmocks.GroupsServiceClient)
-	svc, err := channels.New(repo, policies, idProvider, clientsSvc, groupsSvc, idProvider)
+	availableActions := []roles.Action{}
+	builtInRoles := map[roles.BuiltInRoleName][]roles.Action{
+		clients.BuiltInRoleAdmin: availableActions,
+	}
+	svc, err := channels.New(repo, policies, idProvider, clientsSvc, groupsSvc, idProvider, availableActions, builtInRoles)
 	assert.Nil(t, err, fmt.Sprintf(" Unexpected error  while creating service %v", err))
 	return svc
 }

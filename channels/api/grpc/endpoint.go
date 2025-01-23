@@ -14,6 +14,9 @@ import (
 func authorizeEndpoint(svc channels.Service) endpoint.Endpoint {
 	return func(ctx context.Context, request interface{}) (interface{}, error) {
 		req := request.(authorizeReq)
+		if err := req.validate(); err != nil {
+			return authorizeRes{}, err
+		}
 
 		if err := svc.Authorize(ctx, ch.AuthzReq{
 			DomainID:   req.domainID,
