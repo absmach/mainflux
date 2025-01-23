@@ -11,6 +11,7 @@ import (
 	apiutil "github.com/absmach/supermq/api/http/util"
 	"github.com/absmach/supermq/channels"
 	smqauthn "github.com/absmach/supermq/pkg/authn"
+	roleManagerHttp "github.com/absmach/supermq/pkg/roles/rolemanager/api"
 	"github.com/go-chi/chi/v5"
 	kithttp "github.com/go-kit/kit/transport/http"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -22,6 +23,9 @@ func MakeHandler(svc channels.Service, authn smqauthn.Authentication, mux *chi.M
 	opts := []kithttp.ServerOption{
 		kithttp.ServerErrorEncoder(apiutil.LoggingErrorEncoder(logger, api.EncodeError)),
 	}
+
+	d := roleManagerHttp.NewDecoder("channelID")
+
 	mux.Route("/{domainID}/channels", func(r chi.Router) {
 		r.Use(api.AuthenticateMiddleware(authn, true))
 
@@ -59,6 +63,8 @@ func MakeHandler(svc channels.Service, authn smqauthn.Authentication, mux *chi.M
 			api.EncodeResponse,
 			opts...,
 		), "disconnect").ServeHTTP)
+
+		r = roleManagerHttp.EntityAvailableActionsRouter(svc, d, r, opts)
 
 		r.Route("/{channelID}", func(r chi.Router) {
 			r.Get("/", otelhttp.NewHandler(kithttp.NewServer(
@@ -130,6 +136,8 @@ func MakeHandler(svc channels.Service, authn smqauthn.Authentication, mux *chi.M
 				api.EncodeResponse,
 				opts...,
 			), "disconnect_channel_client").ServeHTTP)
+
+			roleManagerHttp.EntityRoleMangerRouter(svc, d, r, opts)
 		})
 	})
 

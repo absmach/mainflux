@@ -44,10 +44,12 @@ import (
 	pg "github.com/absmach/supermq/pkg/postgres"
 	pgclient "github.com/absmach/supermq/pkg/postgres"
 	"github.com/absmach/supermq/pkg/prometheus"
+	"github.com/absmach/supermq/pkg/roles"
 	"github.com/absmach/supermq/pkg/server"
 	grpcserver "github.com/absmach/supermq/pkg/server/grpc"
 	httpserver "github.com/absmach/supermq/pkg/server/http"
 	"github.com/absmach/supermq/pkg/sid"
+	spicedbdecoder "github.com/absmach/supermq/pkg/spicedb"
 	"github.com/absmach/supermq/pkg/uuid"
 	"github.com/authzed/authzed-go/v1"
 	"github.com/authzed/grpcutil"
@@ -91,6 +93,7 @@ type config struct {
 	SpicedbHost         string        `env:"SMQ_SPICEDB_HOST"               envDefault:"localhost"`
 	SpicedbPort         string        `env:"SMQ_SPICEDB_PORT"               envDefault:"50051"`
 	SpicedbPreSharedKey string        `env:"SMQ_SPICEDB_PRE_SHARED_KEY"     envDefault:"12345678"`
+	SpicedbSchemaFile   string        `env:"SMQ_SPICEDB_SCHEMA_FILE"        envDefault:"schema.zed"`
 }
 
 func main() {
@@ -239,7 +242,7 @@ func main() {
 	defer groupsHandler.Close()
 	logger.Info("Groups gRPC client successfully connected to groups gRPC server " + groupsHandler.Secure())
 
-	svc, psvc, err := newService(ctx, db, dbConfig, authz, policyEvaluator, policyService, cacheclient, cfg.CacheKeyDuration, cfg.ESURL, channelsgRPC, groupsClient, tracer, logger)
+	svc, psvc, err := newService(ctx, db, dbConfig, authz, policyEvaluator, policyService, cacheclient, cfg, channelsgRPC, groupsClient, tracer, logger)
 	if err != nil {
 		logger.Error(fmt.Sprintf("failed to create services: %s", err))
 		exitCode = 1
@@ -309,7 +312,7 @@ func main() {
 	}
 }
 
-func newService(ctx context.Context, db *sqlx.DB, dbConfig pgclient.Config, authz smqauthz.Authorization, pe policies.Evaluator, ps policies.Service, cacheClient *redis.Client, keyDuration time.Duration, esURL string, channels grpcChannelsV1.ChannelsServiceClient, groups grpcGroupsV1.GroupsServiceClient, tracer trace.Tracer, logger *slog.Logger) (clients.Service, pClients.Service, error) {
+func newService(ctx context.Context, db *sqlx.DB, dbConfig pgclient.Config, authz smqauthz.Authorization, pe policies.Evaluator, ps policies.Service, cacheClient *redis.Client, cfg config, channels grpcChannelsV1.ChannelsServiceClient, groups grpcGroupsV1.GroupsServiceClient, tracer trace.Tracer, logger *slog.Logger) (clients.Service, pClients.Service, error) {
 	database := pg.NewDatabase(db, dbConfig, tracer)
 	repo := postgres.NewRepository(database)
 
@@ -320,14 +323,19 @@ func newService(ctx context.Context, db *sqlx.DB, dbConfig pgclient.Config, auth
 	}
 
 	// Clients service
-	cache := cache.NewCache(cacheClient, keyDuration)
+	cache := cache.NewCache(cacheClient, cfg.CacheKeyDuration)
 
-	csvc, err := clients.NewService(repo, ps, cache, channels, groups, idp, sidp)
+	availableActions, builtInRoles, err := availableActionsAndBuiltInRoles(cfg.SpicedbSchemaFile)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	csvc, err = events.NewEventStoreMiddleware(ctx, csvc, esURL)
+	csvc, err := clients.NewService(repo, ps, cache, channels, groups, idp, sidp, availableActions, builtInRoles)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	csvc, err = events.NewEventStoreMiddleware(ctx, csvc, cfg.ESURL)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -362,4 +370,17 @@ func newSpiceDBPolicyServiceEvaluator(cfg config, logger *slog.Logger) (policies
 	ps := spicedb.NewPolicyService(client, logger)
 
 	return pe, ps, nil
+}
+
+func availableActionsAndBuiltInRoles(spicedbSchemaFile string) ([]roles.Action, map[roles.BuiltInRoleName][]roles.Action, error) {
+	availableActions, err := spicedbdecoder.GetActionsFromSchema(spicedbSchemaFile, policies.ClientType)
+	if err != nil {
+		return []roles.Action{}, map[roles.BuiltInRoleName][]roles.Action{}, err
+	}
+
+	builtInRoles := map[roles.BuiltInRoleName][]roles.Action{
+		clients.BuiltInRoleAdmin: availableActions,
+	}
+
+	return availableActions, builtInRoles, err
 }

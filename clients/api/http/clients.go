@@ -46,6 +46,7 @@ func clientsHandler(svc clients.Service, authn smqauthn.Authentication, r *chi.M
 				api.EncodeResponse,
 				opts...,
 			), "create_clients").ServeHTTP)
+
 			r = roleManagerHttp.EntityAvailableActionsRouter(svc, d, r, opts)
 
 			r.Route("/{clientID}", func(r chi.Router) {
@@ -111,16 +112,10 @@ func clientsHandler(svc clients.Service, authn smqauthn.Authentication, r *chi.M
 					api.EncodeResponse,
 					opts...,
 				), "delete_client").ServeHTTP)
+
 				roleManagerHttp.EntityRoleMangerRouter(svc, d, r, opts)
 			})
 		})
-
-		r.Get("/{domainID}/users/{userID}/clients", otelhttp.NewHandler(kithttp.NewServer(
-			listClientsEndpoint(svc),
-			decodeListClients,
-			api.EncodeResponse,
-			opts...,
-		), "list_user_clients").ServeHTTP)
 	})
 	return r
 }

@@ -175,7 +175,7 @@ services:
       - supermq-base-net
     volumes:
       - supermq-domains-db-volume:/var/lib/postgresql/data
-  
+
   domains-redis:
     image: redis:7.2.4-alpine
     container_name: supermq-domains-redis
@@ -500,12 +500,14 @@ services:
       SMQ_SPICEDB_PRE_SHARED_KEY: ${SMQ_SPICEDB_PRE_SHARED_KEY}
       SMQ_SPICEDB_HOST: ${SMQ_SPICEDB_HOST}
       SMQ_SPICEDB_PORT: ${SMQ_SPICEDB_PORT}
+      SMQ_SPICEDB_SCHEMA_FILE: ${SMQ_SPICEDB_SCHEMA_FILE}
     ports:
       - ${SMQ_CLIENTS_HTTP_PORT}:${SMQ_CLIENTS_HTTP_PORT}
       - ${SMQ_CLIENTS_AUTH_GRPC_PORT}:${SMQ_CLIENTS_AUTH_GRPC_PORT}
     networks:
       - supermq-base-net
     volumes:
+      - ./spicedb/schema.zed:${SMQ_SPICEDB_SCHEMA_FILE}
       # Clients gRPC server certificates
       - type: bind
         source: ${SMQ_CLIENTS_AUTH_GRPC_SERVER_CERT:-ssl/certs/dummy/server_cert}
@@ -652,12 +654,14 @@ services:
       SMQ_SPICEDB_PRE_SHARED_KEY: ${SMQ_SPICEDB_PRE_SHARED_KEY}
       SMQ_SPICEDB_HOST: ${SMQ_SPICEDB_HOST}
       SMQ_SPICEDB_PORT: ${SMQ_SPICEDB_PORT}
+      SMQ_SPICEDB_SCHEMA_FILE: ${SMQ_SPICEDB_SCHEMA_FILE}
     ports:
       - ${SMQ_CHANNELS_HTTP_PORT}:${SMQ_CHANNELS_HTTP_PORT}
       - ${SMQ_CHANNELS_GRPC_PORT}:${SMQ_CHANNELS_GRPC_PORT}
     networks:
       - supermq-base-net
     volumes:
+      - ./spicedb/schema.zed:${SMQ_SPICEDB_SCHEMA_FILE}
       # Auth gRPC client certificates
       - type: bind
         source: ${SMQ_AUTH_GRPC_CLIENT_CERT:-ssl/certs/dummy/client_cert}
@@ -1309,57 +1313,3 @@ services:
       - ./nats:/etc/nats
     networks:
       - supermq-base-net
-
-  ui:
-    image: magistrala/ui:${SMQ_RELEASE_TAG}
-    container_name: supermq-ui
-    restart: on-failure
-    environment:
-      SMQ_UI_LOG_LEVEL: ${SMQ_UI_LOG_LEVEL}
-      SMQ_UI_PORT: ${SMQ_UI_PORT}
-      SMQ_HTTP_ADAPTER_URL: ${SMQ_HTTP_ADAPTER_URL}
-      SMQ_CLIENTS_URL: ${SMQ_CLIENTS_URL}
-      SMQ_USERS_URL: ${SMQ_USERS_URL}
-      SMQ_INVITATIONS_URL: ${SMQ_INVITATIONS_URL}
-      SMQ_DOMAINS_URL: ${SMQ_DOMAINS_URL}
-      SMQ_UI_HOST_URL: ${SMQ_UI_HOST_URL}
-      SMQ_UI_VERIFICATION_TLS: ${SMQ_UI_VERIFICATION_TLS}
-      SMQ_UI_CONTENT_TYPE: ${SMQ_UI_CONTENT_TYPE}
-      SMQ_UI_INSTANCE_ID: ${SMQ_UI_INSTANCE_ID}
-      SMQ_UI_DB_HOST: ${SMQ_UI_DB_HOST}
-      SMQ_UI_DB_PORT: ${SMQ_UI_DB_PORT}
-      SMQ_UI_DB_USER: ${SMQ_UI_DB_USER}
-      SMQ_UI_DB_PASS: ${SMQ_UI_DB_PASS}
-      SMQ_UI_DB_NAME: ${SMQ_UI_DB_NAME}
-      SMQ_UI_DB_SSL_MODE: ${SMQ_UI_DB_SSL_MODE}
-      SMQ_UI_DB_SSL_CERT: ${SMQ_UI_DB_SSL_CERT}
-      SMQ_UI_DB_SSL_KEY: ${SMQ_UI_DB_SSL_KEY}
-      SMQ_UI_DB_SSL_ROOT_CERT: ${SMQ_UI_DB_SSL_ROOT_CERT}
-      SMQ_GOOGLE_CLIENT_ID: ${SMQ_GOOGLE_CLIENT_ID}
-      SMQ_GOOGLE_CLIENT_SECRET: ${SMQ_GOOGLE_CLIENT_SECRET}
-      SMQ_GOOGLE_REDIRECT_URL: ${SMQ_GOOGLE_REDIRECT_URL}
-      SMQ_GOOGLE_STATE: ${SMQ_GOOGLE_STATE}
-      SMQ_UI_HASH_KEY: ${SMQ_UI_HASH_KEY}
-      SMQ_UI_BLOCK_KEY: ${SMQ_UI_BLOCK_KEY}
-      SMQ_UI_PATH_PREFIX: ${SMQ_UI_PATH_PREFIX}
-    ports:
-      - ${SMQ_UI_PORT}:${SMQ_UI_PORT}
-    networks:
-      - supermq-base-net
-
-  ui-db:
-    image: postgres:16.2-alpine
-    container_name: supermq-ui-db
-    restart: on-failure
-    command: postgres -c "max_connections=${SMQ_POSTGRES_MAX_CONNECTIONS}"
-    environment:
-      POSTGRES_USER: ${SMQ_UI_DB_USER}
-      POSTGRES_PASSWORD: ${SMQ_UI_DB_PASS}
-      POSTGRES_DB: ${SMQ_UI_DB_NAME}
-      SMQ_POSTGRES_MAX_CONNECTIONS: ${SMQ_POSTGRES_MAX_CONNECTIONS}
-    ports:
-      - 6007:5432
-    networks:
-      - supermq-base-net
-    volumes:
-      - supermq-ui-db-volume:/var/lib/postgresql/data
