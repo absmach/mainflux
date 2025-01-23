@@ -16,8 +16,8 @@ import (
 )
 
 func (repo *repository) SaveClientTelemetry(ctx context.Context, ct journal.ClientTelemetry) error {
-	q := `INSERT INTO clients_telemetry (client_id, domain_id, messages, subscriptions, first_seen, last_seen)
-		VALUES (:client_id, :domain_id, :messages, :subscriptions, :first_seen, :last_seen);`
+	q := `INSERT INTO clients_telemetry (client_id, domain_id, inbound_messages, outbound_messages, subscriptions, first_seen, last_seen)
+		VALUES (:client_id, :domain_id, :inbound_messages, :outbound_messages, :subscriptions, :first_seen, :last_seen);`
 
 	dbct, err := toDBClientsTelemetry(ct)
 	if err != nil {
@@ -78,6 +78,140 @@ func (repo *repository) RetrieveClientTelemetry(ctx context.Context, clientID, d
 	}
 
 	return journal.ClientTelemetry{}, repoerr.ErrNotFound
+}
+
+func (repo *repository) AddSubscription(ctx context.Context, clientID, sub string) error {
+	q := `
+		UPDATE clients_telemetry
+		SET subscriptions = ARRAY_APPEND(subscriptions, :subscriptions),
+			last_seen = :last_seen
+		WHERE client_id = :client_id;
+	`
+	ct := journal.ClientTelemetry{
+		ClientID:      clientID,
+		Subscriptions: []string{sub},
+		LastSeen:      time.Now(),
+	}
+	dbct, err := toDBClientsTelemetry(ct)
+	if err != nil {
+		return errors.Wrap(repoerr.ErrUpdateEntity, err)
+	}
+
+	result, err := repo.db.NamedExecContext(ctx, q, dbct)
+	if err != nil {
+		return postgres.HandleError(repoerr.ErrUpdateEntity, err)
+	}
+
+	if rows, _ := result.RowsAffected(); rows == 0 {
+		return repoerr.ErrNotFound
+	}
+
+	return nil
+}
+
+func (repo *repository) RemoveSubscription(ctx context.Context, clientID, sub string) error {
+	q := `
+		UPDATE clients_telemetry
+		SET subscriptions = ARRAY_REMOVE(subscriptions, :subscriptions)
+		WHERE client_id = :client_id
+		AND (:subscriptions = ANY(subscriptions))
+	`
+	ct := journal.ClientTelemetry{
+		ClientID:      clientID,
+		Subscriptions: []string{sub},
+	}
+	dbct, err := toDBClientsTelemetry(ct)
+	if err != nil {
+		return errors.Wrap(repoerr.ErrUpdateEntity, err)
+	}
+
+	result, err := repo.db.NamedExecContext(ctx, q, dbct)
+	if err != nil {
+		return postgres.HandleError(repoerr.ErrUpdateEntity, err)
+	}
+
+	if rows, _ := result.RowsAffected(); rows == 0 {
+		return repoerr.ErrNotFound
+	}
+
+	return nil
+}
+
+func (repo *repository) RemoveSubscriptionWithConnID(ctx context.Context, connID, clientID string) error {
+	q := `
+		UPDATE clients_telemetry
+		SET subscriptions = ARRAY(
+			SELECT sub
+			FROM unnest(subscriptions) AS sub
+			WHERE sub NOT LIKE '%' || $1 || '%'
+		)
+		WHERE client_id = $2;
+	`
+	_, err := repo.db.ExecContext(ctx, q, connID, clientID)
+	if err != nil {
+		return postgres.HandleError(repoerr.ErrUpdateEntity, err)
+	}
+
+	return nil
+}
+
+func (repo *repository) IncrementInboundMessages(ctx context.Context, clientID string) error {
+	q := `
+		UPDATE clients_telemetry
+		SET inbound_messages = inbound_messages + 1,
+			last_seen = :last_seen
+		WHERE client_id = :client_id;
+	`
+
+	ct := journal.ClientTelemetry{
+		ClientID: clientID,
+		LastSeen: time.Now(),
+	}
+	dbct, err := toDBClientsTelemetry(ct)
+	if err != nil {
+		return errors.Wrap(repoerr.ErrUpdateEntity, err)
+	}
+
+	result, err := repo.db.NamedExecContext(ctx, q, dbct)
+	if err != nil {
+		return postgres.HandleError(repoerr.ErrUpdateEntity, err)
+	}
+
+	if rows, _ := result.RowsAffected(); rows == 0 {
+		return repoerr.ErrNotFound
+	}
+
+	return nil
+}
+
+func (repo *repository) IncrementOutboundMessages(ctx context.Context, channelID, subtopic string) error {
+	q := `
+		WITH matched_clients AS (
+			SELECT 
+				client_id,
+				domain_id,
+				COUNT(*) AS match_count
+			FROM 
+				clients_telemetry,
+				unnest(subscriptions) AS sub
+			WHERE 
+				sub LIKE '%' || $1 || ':' || $2 || '%'
+			GROUP BY 
+				client_id, domain_id
+		)
+		UPDATE clients_telemetry
+		SET outbound_messages = outbound_messages + matched_clients.match_count
+		FROM matched_clients
+		WHERE clients_telemetry.client_id = matched_clients.client_id
+		AND clients_telemetry.domain_id = matched_clients.domain_id;
+	`
+
+	_, err := repo.db.ExecContext(ctx, q, channelID, subtopic)
+	if err != nil {
+		return postgres.HandleError(repoerr.ErrUpdateEntity, err)
+	}
+
+	return nil
 }
 
 type dbClientTelemetry struct {

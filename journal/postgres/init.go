@@ -30,13 +30,14 @@ func Migration() *migrate.MemoryMigrationSource {
 					`CREATE TABLE IF NOT EXISTS clients_telemetry (
 						client_id         VARCHAR(36) NOT NULL,
 						domain_id         VARCHAR(36) NOT NULL,
-						subscriptions     TEXT[],
+						subscriptions     TEXT[] DEFAULT '{}',
 						inbound_messages  BIGINT DEFAULT 0,
 						outbound_messages BIGINT DEFAULT 0,
 						first_seen        TIMESTAMP,
 						last_seen         TIMESTAMP,
 						PRIMARY KEY (client_id, domain_id)
 					)`,
+					`CREATE INDEX idx_subscriptions_gin ON clients_telemetry USING GIN (subscriptions);`,
 				},
 				Down: []string{
 					`DROP TABLE IF EXISTS clients_telemetry`,
