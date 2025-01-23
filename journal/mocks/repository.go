@@ -16,6 +16,24 @@ type Repository struct {
 	mock.Mock
 }
 
+// AddSubscription provides a mock function with given fields: ctx, clientID, sub
+func (_m *Repository) AddSubscription(ctx context.Context, clientID string, sub string) error {
+	ret := _m.Called(ctx, clientID, sub)
+
+	if len(ret) == 0 {
+		panic("no return value specified for AddSubscription")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string) error); ok {
+		r0 = rf(ctx, clientID, sub)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // DeleteClientTelemetry provides a mock function with given fields: ctx, clientID, domainID
 func (_m *Repository) DeleteClientTelemetry(ctx context.Context, clientID string, domainID string) error {
 	ret := _m.Called(ctx, clientID, domainID)
@@ -27,6 +45,78 @@ func (_m *Repository) DeleteClientTelemetry(ctx context.Context, clientID string
 	var r0 error
 	if rf, ok := ret.Get(0).(func(context.Context, string, string) error); ok {
 		r0 = rf(ctx, clientID, domainID)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// IncrementInboundMessages provides a mock function with given fields: ctx, clientID
+func (_m *Repository) IncrementInboundMessages(ctx context.Context, clientID string) error {
+	ret := _m.Called(ctx, clientID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for IncrementInboundMessages")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) error); ok {
+		r0 = rf(ctx, clientID)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// IncrementOutboundMessages provides a mock function with given fields: ctx, channelID, subtopic
+func (_m *Repository) IncrementOutboundMessages(ctx context.Context, channelID string, subtopic string) error {
+	ret := _m.Called(ctx, channelID, subtopic)
+
+	if len(ret) == 0 {
+		panic("no return value specified for IncrementOutboundMessages")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string) error); ok {
+		r0 = rf(ctx, channelID, subtopic)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// RemoveSubscription provides a mock function with given fields: ctx, clientID, sub
+func (_m *Repository) RemoveSubscription(ctx context.Context, clientID string, sub string) error {
+	ret := _m.Called(ctx, clientID, sub)
+
+	if len(ret) == 0 {
+		panic("no return value specified for RemoveSubscription")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string) error); ok {
+		r0 = rf(ctx, clientID, sub)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// RemoveSubscriptionWithConnID provides a mock function with given fields: ctx, connID, clientID
+func (_m *Repository) RemoveSubscriptionWithConnID(ctx context.Context, connID string, clientID string) error {
+	ret := _m.Called(ctx, connID, clientID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for RemoveSubscriptionWithConnID")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string) error); ok {
+		r0 = rf(ctx, connID, clientID)
 	} else {
 		r0 = ret.Error(0)
 	}

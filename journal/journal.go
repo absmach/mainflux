@@ -179,4 +179,14 @@ type Repository interface {
 
 	// DeleteClientTelemetry removes telemetry data for a client from the database.
 	DeleteClientTelemetry(ctx context.Context, clientID, domainID string) error
+
+	AddSubscription(ctx context.Context, clientID, sub string) error
+
+	RemoveSubscription(ctx context.Context, clientID, sub string) error
+
+	RemoveSubscriptionWithConnID(ctx context.Context, connID, clientID string) error 
+
+	IncrementInboundMessages(ctx context.Context, clientID string) error
+
+	IncrementOutboundMessages(ctx context.Context, channelID, subtopic string) error
 }
