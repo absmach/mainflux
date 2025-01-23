@@ -26,14 +26,15 @@ var (
 	namegen      = namegenerator.NewGenerator()
 	invalidID    = strings.Repeat("a", 37)
 	validChannel = channels.Channel{
-		ID:          testsutil.GenerateUUID(&testing.T{}),
-		Domain:      testsutil.GenerateUUID(&testing.T{}),
-		ParentGroup: testsutil.GenerateUUID(&testing.T{}),
-		Name:        namegen.Generate(),
-		Tags:        []string{"tag1", "tag2"},
-		Metadata:    map[string]interface{}{"key": "value"},
-		CreatedAt:   time.Now().UTC().Truncate(time.Microsecond),
-		Status:      clients.EnabledStatus,
+		ID:              testsutil.GenerateUUID(&testing.T{}),
+		Domain:          testsutil.GenerateUUID(&testing.T{}),
+		ParentGroup:     testsutil.GenerateUUID(&testing.T{}),
+		Name:            namegen.Generate(),
+		Tags:            []string{"tag1", "tag2"},
+		Metadata:        map[string]interface{}{"key": "value"},
+		CreatedAt:       time.Now().UTC().Truncate(time.Microsecond),
+		Status:          clients.EnabledStatus,
+		ConnectionTypes: []connections.ConnType{},
 	}
 	validConnection = channels.Connection{
 		ClientID:  testsutil.GenerateUUID(&testing.T{}),
@@ -431,13 +432,14 @@ func TestRetrieveAll(t *testing.T) {
 	for i := 0; i < num; i++ {
 		name := namegen.Generate()
 		channel := channels.Channel{
-			ID:          testsutil.GenerateUUID(t),
-			Domain:      testsutil.GenerateUUID(t),
-			ParentGroup: parentID,
-			Name:        name,
-			Metadata:    map[string]interface{}{"name": name},
-			CreatedAt:   time.Now().UTC().Truncate(time.Microsecond),
-			Status:      clients.EnabledStatus,
+			ID:              testsutil.GenerateUUID(t),
+			Domain:          testsutil.GenerateUUID(t),
+			ParentGroup:     parentID,
+			Name:            name,
+			Metadata:        map[string]interface{}{"name": name},
+			CreatedAt:       time.Now().UTC().Truncate(time.Microsecond),
+			Status:          clients.EnabledStatus,
+			ConnectionTypes: []connections.ConnType{},
 		}
 		_, err := repo.Save(context.Background(), channel)
 		require.Nil(t, err, fmt.Sprintf("create channel unexpected error: %s", err))
@@ -1330,13 +1332,14 @@ func TestRetrieveParentGroupChannels(t *testing.T) {
 	for i := 0; i < 10; i++ {
 		name := namegen.Generate()
 		channel := channels.Channel{
-			ID:          testsutil.GenerateUUID(t),
-			Domain:      testsutil.GenerateUUID(t),
-			ParentGroup: parentID,
-			Name:        name,
-			Metadata:    map[string]interface{}{"name": name},
-			CreatedAt:   time.Now().UTC().Truncate(time.Microsecond),
-			Status:      clients.EnabledStatus,
+			ID:              testsutil.GenerateUUID(t),
+			Domain:          testsutil.GenerateUUID(t),
+			ParentGroup:     parentID,
+			Name:            name,
+			Metadata:        map[string]interface{}{"name": name},
+			CreatedAt:       time.Now().UTC().Truncate(time.Microsecond),
+			Status:          clients.EnabledStatus,
+			ConnectionTypes: []connections.ConnType{},
 		}
 		items = append(items, channel)
 	}
