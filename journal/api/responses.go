@@ -10,8 +10,10 @@ import (
 	"github.com/absmach/supermq/journal"
 )
 
-var _ supermq.Response = (*pageRes)(nil)
-var _ supermq.Response = (*clientTelemetryRes)(nil)
+var (
+	_ supermq.Response = (*pageRes)(nil)
+	_ supermq.Response = (*clientTelemetryRes)(nil)
+)
 
 type pageRes struct {
 	journal.JournalsPage `json:",inline"`

@@ -25,7 +25,6 @@ type EventStore interface {
 type eventStore struct {
 	publisher events.Publisher
 	instance  string
-	
 }
 
 // NewEventStore returns wrapper around mProxy service that sends

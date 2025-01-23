@@ -180,13 +180,18 @@ type Repository interface {
 	// DeleteClientTelemetry removes telemetry data for a client from the database.
 	DeleteClientTelemetry(ctx context.Context, clientID, domainID string) error
 
+	// AddSubscription adds a subscription to the client telemetry.
 	AddSubscription(ctx context.Context, clientID, sub string) error
 
+	// RemoveSubscription removes a subscription from the client telemetry.
 	RemoveSubscription(ctx context.Context, clientID, sub string) error
 
-	RemoveSubscriptionWithConnID(ctx context.Context, connID, clientID string) error 
+	// RemoveSubscriptionWithConnID removes a subscription from the client telemetry using the connection ID.
+	RemoveSubscriptionWithConnID(ctx context.Context, connID, clientID string) error
 
+	// IncrementInboundMessages increments the inbound messages count for a client.
 	IncrementInboundMessages(ctx context.Context, clientID string) error
 
+	// IncrementOutboundMessages increments the outbound messages count for a client.
 	IncrementOutboundMessages(ctx context.Context, channelID, subtopic string) error
 }
