@@ -17,13 +17,14 @@ import (
 	chmocks "github.com/absmach/supermq/channels/mocks"
 	clmocks "github.com/absmach/supermq/clients/mocks"
 	mhttp "github.com/absmach/supermq/http"
+	"github.com/absmach/supermq/http/mocks"
 	"github.com/absmach/supermq/internal/testsutil"
 	smqlog "github.com/absmach/supermq/logger"
 	smqauthn "github.com/absmach/supermq/pkg/authn"
 	authnmocks "github.com/absmach/supermq/pkg/authn/mocks"
 	"github.com/absmach/supermq/pkg/errors"
 	svcerr "github.com/absmach/supermq/pkg/errors/service"
-	"github.com/absmach/supermq/pkg/messaging/mocks"
+	msgmocks "github.com/absmach/supermq/pkg/messaging/mocks"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -58,13 +59,15 @@ var (
 	errFailedParseSubtopic      = errors.New("failed to parse subtopic")
 	errMalformedSubtopic        = errors.New("malformed subtopic")
 	errFailedPublishToMsgBroker = errors.New("failed to publish to supermq message broker")
+	errFailedPublishEvent       = errors.New("failed to publish event")
 )
 
 var (
 	clients   = new(clmocks.ClientsServiceClient)
 	channels  = new(chmocks.ChannelsServiceClient)
 	authn     = new(authnmocks.Authentication)
-	publisher = new(mocks.PubSub)
+	publisher = new(msgmocks.PubSub)
+	es        = new(mocks.EventStore)
 )
 
 func newHandler() session.Handler {
@@ -72,9 +75,10 @@ func newHandler() session.Handler {
 	authn = new(authnmocks.Authentication)
 	clients = new(clmocks.ClientsServiceClient)
 	channels = new(chmocks.ChannelsServiceClient)
-	publisher = new(mocks.PubSub)
+	publisher = new(msgmocks.PubSub)
+	es = new(mocks.EventStore)
 
-	return mhttp.NewHandler(publisher, authn, clients, channels, logger)
+	return mhttp.NewHandler(publisher, es, authn, clients, channels, logger)
 }
 
 func TestAuthConnect(t *testing.T) {
@@ -121,12 +125,14 @@ func TestAuthConnect(t *testing.T) {
 			if tc.session != nil {
 				ctx = session.NewContext(ctx, tc.session)
 			}
+			eventsCall := es.On("Connect", ctx, clientKey).Return(nil)
 			err := handler.AuthConnect(ctx)
 			hpe, ok := err.(mghttp.HTTPProxyError)
 			if ok {
 				assert.Equal(t, tc.status, hpe.StatusCode())
 			}
 			assert.True(t, errors.Contains(err, tc.err))
+			eventsCall.Unset()
 		})
 	}
 }
@@ -144,20 +150,21 @@ func TestPublish(t *testing.T) {
 		Password: []byte(apiutil.BearerPrefix + validToken),
 	}
 	cases := []struct {
-		desc       string
-		topic      *string
-		channelID  string
-		payload    *[]byte
-		password   string
-		session    *session.Session
-		status     int
-		authNRes   *grpcClientsV1.AuthnRes
-		authNRes1  smqauthn.Session
-		authNErr   error
-		authZRes   *grpcChannelsV1.AuthzRes
-		authZErr   error
-		publishErr error
-		err        error
+		desc         string
+		topic        *string
+		channelID    string
+		payload      *[]byte
+		password     string
+		session      *session.Session
+		status       int
+		authNRes     *grpcClientsV1.AuthnRes
+		authNRes1    smqauthn.Session
+		authNErr     error
+		authZRes     *grpcChannelsV1.AuthzRes
+		authZErr     error
+		publishErr   error
+		esPublishErr error
+		err          error
 	}{
 		{
 			desc:      "publish  with key successfully",
@@ -325,6 +332,20 @@ func TestPublish(t *testing.T) {
 			publishErr: errors.New("failed to publish"),
 			err:        errFailedPublishToMsgBroker,
 		},
+		{
+			desc:         "publish with key and failed to publish to event store",
+			topic:        &topic,
+			payload:      &payload,
+			password:     clientKey,
+			session:      &clientKeySession,
+			channelID:    chanID,
+			authNRes:     &grpcClientsV1.AuthnRes{Id: clientID, Authenticated: true},
+			authNErr:     nil,
+			authZRes:     &grpcChannelsV1.AuthzRes{Authorized: true},
+			authZErr:     nil,
+			esPublishErr: errors.New("failed to publish to event store"),
+			err:          errFailedPublishEvent,
+		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.desc, func(t *testing.T) {
@@ -336,6 +357,7 @@ func TestPublish(t *testing.T) {
 			authCall := authn.On("Authenticate", ctx, mock.Anything).Return(tc.authNRes1, tc.authNErr)
 			channelsCall := channels.On("Authorize", ctx, mock.Anything).Return(tc.authZRes, tc.authZErr)
 			repoCall := publisher.On("Publish", ctx, tc.channelID, mock.Anything).Return(tc.publishErr)
+			eventsCall := es.On("Publish", ctx, mock.Anything, tc.channelID, mock.Anything).Return(tc.esPublishErr)
 			err := handler.Publish(ctx, tc.topic, tc.payload)
 			hpe, ok := err.(mghttp.HTTPProxyError)
 			if ok {
@@ -346,6 +368,7 @@ func TestPublish(t *testing.T) {
 			repoCall.Unset()
 			clientsCall.Unset()
 			channelsCall.Unset()
+			eventsCall.Unset()
 		})
 	}
 }
