@@ -95,15 +95,7 @@ func (h *handler) AuthPublish(ctx context.Context, topic *string, payload *[]byt
 		return errClientNotInitialized
 	}
 
-	var token string
-	switch {
-	case strings.HasPrefix(string(s.Password), "Client"):
-		token = strings.ReplaceAll(string(s.Password), "Client ", "")
-	default:
-		token = string(s.Password)
-	}
-
-	clientID, err := h.authAccess(ctx, token, *topic, connections.Publish)
+	clientID, err := h.authAccess(ctx, string(s.Password), *topic, connections.Publish)
 	if err != nil {
 		return err
 	}
@@ -129,16 +121,8 @@ func (h *handler) AuthSubscribe(ctx context.Context, topics *[]string) error {
 		return errMissingTopicSub
 	}
 
-	var token string
-	switch {
-	case strings.HasPrefix(string(s.Password), "Client"):
-		token = strings.ReplaceAll(string(s.Password), "Client ", "")
-	default:
-		token = string(s.Password)
-	}
-
 	for _, topic := range *topics {
-		clientID, err := h.authAccess(ctx, token, topic, connections.Subscribe)
+		clientID, err := h.authAccess(ctx, string(s.Password), topic, connections.Subscribe)
 		if err != nil {
 			return err
 		}
@@ -259,15 +243,8 @@ func (h *handler) Unsubscribe(ctx context.Context, topics *[]string) error {
 		return errMissingTopicSub
 	}
 
-	var token string
-	switch {
-	case strings.HasPrefix(string(s.Password), "Client"):
-		token = strings.ReplaceAll(string(s.Password), "Client ", "")
-	default:
-		token = string(s.Password)
-	}
 	for _, topic := range *topics {
-		clientID, err := h.authAccess(ctx, token, topic, connections.Subscribe)
+		clientID, err := h.authAccess(ctx, string(s.Password), topic, connections.Subscribe)
 		if err != nil {
 			return err
 		}
